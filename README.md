@@ -1,4 +1,4 @@
-# GreenChat — chat Twitch local façon Twitchat
+# GreenChat — chat Twitch local
 
 Un poste de contrôle pour ton live, 100 % local : chat multi-colonnes, modération, message mis en avant sur le stream, alertes, infos du stream et planning, avec des overlays pour OBS.
 
