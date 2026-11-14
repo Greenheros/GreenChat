@@ -1,56 +1,144 @@
-# GreenChat — chat Twitch local façon Twitchat
+# 💚 GreenChat
 
-Un poste de contrôle pour ton live, 100 % local : chat multi-colonnes, modération, message mis en avant sur le stream, alertes, infos du stream et planning, avec des overlays pour OBS.
+**Le poste de contrôle de ton live Twitch, 100 % local.**
+Chat multi-colonnes, modération, commandes de streamer, sondages, alertes et overlays OBS, réunis dans un seul panneau qui tourne sur ton PC.
 
-## Installation (une seule fois)
+> Gratuit · en français · aucun serveur tiers : ta connexion Twitch reste sur ta machine.
 
-1. Installe **Node.js 18 ou plus** (version LTS) : https://nodejs.org
-2. Dézippe le dossier `greenchat` où tu veux (par ex. sur le mini PC).
-3. Double-clique sur **`start.bat`**. Au premier lancement, il installe les dépendances tout seul.
-4. Ouvre **http://localhost:3500** (ou `http://IP-du-mini-PC:3500` depuis le PC de stream).
+---
 
-> Le pare-feu Windows peut demander l'autorisation pour Node.js : accepte sur « Réseau privé » pour pouvoir l'ouvrir depuis un autre PC.
-> Pour un autre port : `set PORT=4000` avant `node server.js`.
+## Sommaire
 
-## Connexion Twitch
+- [Fonctions](#-fonctions)
+- [Installation](#-installation)
+- [Connexion à Twitch](#-connexion-à-twitch)
+- [Utilisation dans OBS](#-utilisation-dans-obs)
+- [Commandes du chat](#-commandes-du-chat)
+- [Dépannage](#-dépannage)
+- [Structure du projet](#-structure-du-projet)
+- [Feuille de route](#-feuille-de-route)
 
-Sans connexion, le chat s'affiche en lecture seule. Pour écrire, modérer, voir les follows et les points de chaîne :
+---
 
-1. https://dev.twitch.tv/console/apps → **Enregistrer votre application**
+## ✨ Fonctions
+
+| Onglet | Ce qu'on peut faire |
+|---|---|
+| 💬 **Chat** | Colonnes illimitées, chacune avec son **panneau de filtres** : messages (mentions, premiers messages, modos/VIP, abonnés), follows, abos, bits, raids, points de chaîne, sondages, prédictions, train de la hype, objectifs, modération… Aperçu de chaque type, préréglages, couleur de fond. Emotes Twitch, 7TV, BTTV et FFZ, badges, réponses, recherche, complétion des pseudos avec Tab. Au survol d'un message : ⭐ afficher sur le stream, répondre, copier, supprimer, timeout, ban. Clic sur un pseudo : fiche du viewer. |
+| 🎬 **Stream** | Titre, catégorie et tags. Shoutout, annonces en couleur, marqueurs, clips. **Commandes admin** : modes du chat (lent, followers, abonnés, emotes, messages uniques, délai), mode bouclier, vider le chat, timeout/ban/unban/avertissement, modos et VIP, raid, publicités, sondages et prédictions avec résultats en direct. |
+| 📅 **Planning** | Semaine type, événements ponctuels (live spécial, annulation), overlay planning et bouton **Copier pour Discord**. |
+| 🖥️ **OBS** | Adresses des overlays, aperçus, réglages en direct, boutons de test des alertes. |
+| ⚙️ **Réglages** | Compte Twitch, mots surlignés, bots masqués, sons de notification, mode démo, diagnostic des événements Twitch reçus. |
+
+---
+
+## 📦 Installation
+
+**Prérequis :** Windows 10/11, [Node.js](https://nodejs.org) 18 ou plus récent (version LTS), un compte Twitch.
+
+1. Télécharge le projet (bouton **Code → Download ZIP**) et dézippe-le où tu veux.
+2. Double-clique sur **`start.bat`**. Au premier lancement, les dépendances s'installent toutes seules.
+3. Le panneau s'ouvre sur **http://localhost:3500**.
+
+> 💡 GreenChat peut tourner sur un **PC dédié ou un mini-PC** : ouvre alors `http://IP-du-PC:3500` depuis le PC de stream.
+> Le pare-feu Windows doit autoriser Node.js sur les **réseaux privés**.
+> Pour changer de port : `set PORT=4000` avant `node server.js`.
+
+---
+
+## 🔑 Connexion à Twitch
+
+Sans connexion, le chat s'affiche en lecture seule. Pour écrire, modérer et recevoir les événements :
+
+1. Va sur [dev.twitch.tv/console/apps](https://dev.twitch.tv/console/apps) → **Enregistrer votre application**.
    - URL de redirection : `http://localhost`
    - Catégorie : *Chat Bot*
-   - Type de client : **Public** (important, sinon la connexion échoue)
-2. Dans GreenChat → **Réglages** : colle le **Client ID**, mets le nom de ta chaîne, **Enregistrer**.
-3. **Se connecter avec Twitch** → une page twitch.tv/activate s'ouvre avec un code à valider.
+   - Type de client : **Public** (important)
+2. Dans GreenChat → **Réglages** : colle le **Client ID**, indique ta chaîne, **Enregistrer**.
+3. Clique sur **Se connecter avec Twitch** et valide le code sur twitch.tv/activate.
 
-Connecte-toi avec **ton compte de streamer** : les follows, les points de chaîne et les pubs ne sont disponibles que pour le propriétaire de la chaîne (les follows aussi pour un modo).
+Connecte-toi avec **le compte du streamer** : raids, pubs, sondages, prédictions, rôles et certains événements sont réservés au propriétaire de la chaîne.
+Si une mise à jour demande de nouvelles autorisations, un bandeau orange apparaît dans l'onglet Stream : un clic suffit pour les accorder.
 
-## Ce que ça fait
+---
 
-| Onglet | Fonctions |
-|---|---|
-| **Chat** | Colonnes configurables (⚙️ filtres : messages, événements, mentions, premiers messages, modos/VIP, points, bits, masquer bots et commandes). Emotes Twitch + 7TV + BTTV + FFZ, badges, réponses, recherche. Au survol d'un message : ⭐ afficher sur le stream, répondre, copier, supprimer, timeout, ban. Clic sur un pseudo → fiche (ancienneté, follow, historique, TO/ban/shoutout). Commandes : `/timeout pseudo 600`, `/ban`, `/unban`, `/so`, `/announce`, `/clear`, `/me`. Tab = complétion des pseudos, ↑ = historique. |
-| **Stream** | Titre et catégorie du live, shoutout, annonce, viewers et durée du live. |
-| **Planning** | Semaine type (créneaux récurrents), événements ponctuels (live spécial, annulation), bouton **Copier pour Discord** (format prêt pour #annonces-planning), aperçu de l'overlay. |
-| **OBS** | URLs des overlays, aperçus, réglages en direct, boutons de test des alertes. |
-| **Réglages** | Compte Twitch, mots surlignés, bots masqués, sons de notification, **mode démo** (faux chat pour régler tes overlays hors live). |
+## 🎥 Utilisation dans OBS
 
-## Overlays OBS (Sources → ＋ → Navigateur)
+### Le panneau comme dock
 
-| Overlay | URL | Taille |
+1. Dans OBS Studio : **Docks → Docks de navigateur personnalisés…**
+2. Nom : `GreenChat`, URL : `http://localhost:3500` → **Appliquer**.
+3. Place le panneau où tu veux dans l'interface d'OBS.
+
+### Les overlays (Sources → ＋ → Navigateur)
+
+| Overlay | Adresse | Taille |
 |---|---|---|
-| Chat | `/overlay/chat.html` | 450 × 800 |
-| Alertes | `/overlay/alerts.html` | 1920 × 1080 (cocher « Contrôler l'audio via OBS ») |
-| Message mis en avant | `/overlay/highlight.html` | 1920 × 1080 |
-| Planning | `/overlay/planning.html` (ou `?layout=compact` en bandeau 1920 × 200) | 1920 × 1080 |
+| 💬 Chat | `http://localhost:3500/overlay/chat.html` | 450 × 800 |
+| 🔔 Alertes | `http://localhost:3500/overlay/alerts.html` | 1920 × 1080 (cocher « Contrôler l'audio via OBS ») |
+| ⭐ Message mis en avant | `http://localhost:3500/overlay/highlight.html` | 1920 × 1080 |
+| 📅 Planning | `http://localhost:3500/overlay/planning.html` (`?layout=compact` pour un bandeau 1920 × 200) | 1920 × 1080 |
 
-Les réglages peuvent être forcés par l'URL, par ex. `/overlay/chat.html?fontSize=28&hideAfter=30` ou `/overlay/highlight.html?position=bottom-center`.
-Pour changer le style de tous les overlays : `public/css/overlay-custom.css`.
+Les réglages peuvent être forcés dans l'adresse, par exemple `chat.html?fontSize=28&hideAfter=30` ou `highlight.html?position=bottom-center`.
+Le style de tous les overlays se personnalise dans `public/css/overlay-custom.css`.
+Le **mode démo** (Réglages) génère un faux chat pour régler les overlays hors live.
 
-## Fichiers
+---
 
-- `server.js` : serveur (chat Twitch, EventSub, API Twitch, WebSocket vers les pages)
-- `public/` : panneau de contrôle et overlays
-- `data/` : créé au premier lancement — `config.json` (contient ton token Twitch : ne le partage pas), `settings.json`, `planning.json`
+## ⌨️ Commandes du chat
 
-Le serveur écoute sur tout ton réseau local (pour le PC de stream). N'ouvre pas le port 3500 sur Internet.
+À taper dans la zone de message de l'onglet Chat :
+
+| Modération | Modes du chat | Stream |
+|---|---|---|
+| `/timeout pseudo 10m raison` | `/slow 30` · `/slowoff` | `/raid pseudo` · `/unraid` |
+| `/ban pseudo raison` | `/followers 10m` · `/followersoff` | `/commercial 60` |
+| `/unban pseudo` | `/subscribers` · `/subscribersoff` | `/marker texte` |
+| `/warn pseudo raison` | `/emoteonly` · `/emoteonlyoff` | `/clip` |
+| `/mod` · `/unmod pseudo` | `/uniquechat` · `/uniquechatoff` | `/so pseudo` |
+| `/vip` · `/unvip pseudo` | `/shieldmode` · `/shieldmodeoff` | `/announce message` (`/announceblue`, `green`, `orange`, `purple`) |
+| `/clear` | | `/me action` |
+
+---
+
+## 🛠️ Dépannage
+
+| Problème | Solution |
+|---|---|
+| La page ne s'ouvre pas depuis un autre PC (délai dépassé) | Autorise le port 3500 dans le pare-feu du PC qui fait tourner GreenChat (profil **Privé**). |
+| Firefox affiche `SSL_ERROR_RX_RECORD_TOO_LONG` | Tape l'adresse avec **`http://`** : GreenChat ne fonctionne pas en https. |
+| Un type d'événement n'arrive pas | **Réglages → Compte Twitch → Événements Twitch reçus (diagnostic)** : chaque abonnement y est affiché avec ✅ ou ❌ et la raison. |
+| Sondages, prédictions ou pubs refusés | Ces fonctions demandent une chaîne **affiliée ou partenaire** et le compte du streamer. |
+
+---
+
+## 📁 Structure du projet
+
+```
+greenchat/
+├── server.js            Serveur : chat Twitch (IRC), EventSub, API Twitch, WebSocket vers les pages
+├── start.bat            Lancement en double-clic (installe les dépendances au besoin)
+├── package.json
+├── public/
+│   ├── index.html       Panneau de contrôle
+│   ├── js/              app.js (panneau), common.js (partagé avec les overlays)
+│   ├── css/             app.css, overlay-custom.css
+│   └── overlay/         chat, alerts, highlight, planning
+├── site/                Page vitrine du projet
+└── data/                Créé au premier lancement, jamais publié (voir .gitignore)
+```
+
+> 🔒 `data/config.json` contient ton jeton Twitch. Ne le partage jamais : il est exclu du dépôt par le `.gitignore`.
+
+---
+
+## 🗺️ Feuille de route
+
+- [ ] Installateur Windows (`GreenChat-Setup.exe`) avec icône près de l'horloge et démarrage automatique
+- [ ] Assistant de première configuration
+- [ ] Vue « dock » compacte pour les panneaux étroits d'OBS
+- [ ] Pilotage d'OBS via obs-websocket (changement de scène sur raid ou pub…)
+
+---
+
+*Twitch est une marque de Twitch Interactive, Inc. GreenChat n'est ni affilié ni approuvé par Twitch.*
