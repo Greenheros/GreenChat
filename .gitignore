@@ -1,0 +1,13 @@
+# Dépendances (réinstallées par start.bat / npm install)
+node_modules/
+
+# Données locales : contient le jeton Twitch, ne JAMAIS publier
+data/
+
+# Sauvegardes locales
+backup-*/
+
+# Divers
+*.log
+.DS_Store
+Thumbs.db

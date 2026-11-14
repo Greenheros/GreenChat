@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GreenChat — poste de contrôle</title>
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div class="app">
+  <nav class="side">
+    <div class="logo" title="GreenChat">G</div>
+    <button class="nav active" data-tab="chat" title="Chat"><span>💬</span>Chat</button>
+    <button class="nav" data-tab="stream" title="Stream"><span>🎬</span>Stream</button>
+    <button class="nav" data-tab="planning" title="Planning"><span>📅</span>Planning</button>
+    <button class="nav" data-tab="obs" title="OBS"><span>🖥️</span>OBS</button>
+    <button class="nav" data-tab="settings" title="Paramètres"><span>⚙️</span>Réglages</button>
+    <div class="side-status">
+      <div class="dot" id="dotIrc" title="Chat"></div>
+      <div class="dot" id="dotEs" title="EventSub"></div>
+    </div>
+  </nav>
+
+  <main>
+    <!-- ================= CHAT ================= -->
+    <section class="tab active" id="tab-chat">
+      <header class="bar">
+        <div class="bar-left">
+          <strong id="chanName">—</strong>
+          <span class="pill" id="ircPill">hors ligne</span>
+          <span class="pill" id="demoPill" hidden>DÉMO</span>
+        </div>
+        <div class="bar-right">
+          <input id="search" type="search" placeholder="Rechercher (texte ou pseudo)…">
+          <button class="btn ghost" id="addCol" title="Ajouter une colonne">＋ Colonne</button>
+        </div>
+      </header>
+      <div class="onscreen" id="onscreen" hidden>
+        <span>⭐ À l'écran :</span><span id="onscreenText"></span>
+        <button class="btn small" id="onscreenOff">Retirer de l'écran</button>
+      </div>
+      <div class="columns" id="columns"></div>
+      <footer class="composer">
+        <div class="replying" id="replying" hidden><span id="replyingText"></span><button class="x" id="replyCancel">✕</button></div>
+        <div class="composer-row">
+          <input id="msgInput" placeholder="Envoyer un message… (/timeout, /ban, /slow, /raid, /commercial… liste complète dans l'onglet Stream)" autocomplete="off">
+          <button class="btn" id="sendBtn">Envoyer</button>
+        </div>
+      </footer>
+    </section>
+
+    <!-- ================= STREAM ================= -->
+    <section class="tab" id="tab-stream">
+      <header class="bar"><strong>Infos du stream</strong><span class="pill" id="livePill">—</span></header>
+      <div class="pad grid2">
+        <div class="card">
+          <h3>Titre et catégorie</h3>
+          <label>Depuis le planning<select id="planPick"></select></label>
+          <label>Titre<input id="streamTitle" maxlength="140"></label>
+          <label>Catégorie
+            <div class="ac"><input id="catInput" placeholder="Rechercher un jeu…" autocomplete="off"><div class="ac-list" id="catList"></div></div>
+          </label>
+          <label>Tags <span class="muted">(séparés par des virgules, 10 max, sans espaces)</span><input id="streamTags" placeholder="Français, Horreur, Chill"></label>
+          <div class="row"><button class="btn" id="streamSave">Mettre à jour</button><button class="btn ghost" id="streamReload">Recharger</button></div>
+          <p class="muted" id="streamMsg"></p>
+        </div>
+        <div class="card">
+          <h3>Actions rapides</h3>
+          <label>Shoutout (/so)<div class="row"><input id="soInput" placeholder="pseudo"><button class="btn" id="soBtn">Envoyer</button></div></label>
+          <label>Annonce dans le chat<div class="row"><input id="annInput" placeholder="message">
+            <select id="annColor" style="width:auto"><option value="primary">Couleur chaîne</option><option value="blue">Bleu</option><option value="green">Vert</option><option value="orange">Orange</option><option value="purple">Violet</option></select>
+            <button class="btn" id="annBtn">Annoncer</button></div></label>
+          <label>Marqueur de stream <span class="muted">(pour retrouver le moment dans la VOD)</span><div class="row"><input id="markerInput" placeholder="description (facultatif)" maxlength="140"><button class="btn ghost" id="markerBtn">📍 Marqueur</button></div></label>
+          <div class="row wrap"><button class="btn ghost" id="clipBtn">🎬 Créer un clip</button><span class="muted" id="clipMsg"></span></div>
+          <div class="stats" id="liveStats"></div>
+        </div>
+      </div>
+
+      <div class="pad" style="padding-top:0">
+        <div class="scope-warn" id="scopeWarn" hidden></div>
+        <h3 class="section-title">Commandes admin <button class="btn small ghost" id="adminReload" title="Rafraîchir">↻</button> <span class="muted" id="adminMsg"></span></h3>
+        <div class="grid2">
+          <!-- Modes du chat -->
+          <div class="card">
+            <h3>Modes du chat</h3>
+            <div class="modes">
+              <div class="mode"><label class="check"><input type="checkbox" data-mode="slow_mode"> 🐢 Mode lent</label>
+                <select id="slowWait"><option value="3">3 s</option><option value="5">5 s</option><option value="10">10 s</option><option value="20">20 s</option><option value="30" selected>30 s</option><option value="60">60 s</option><option value="120">120 s</option></select></div>
+              <div class="mode"><label class="check"><input type="checkbox" data-mode="follower_mode"> 💚 Followers uniquement</label>
+                <select id="followDur"><option value="0">dès le follow</option><option value="10">depuis 10 min</option><option value="30">depuis 30 min</option><option value="60">depuis 1 h</option><option value="1440">depuis 1 jour</option><option value="10080">depuis 1 semaine</option><option value="43200">depuis 1 mois</option><option value="129600">depuis 3 mois</option></select></div>
+              <div class="mode"><label class="check"><input type="checkbox" data-mode="subscriber_mode"> ⭐ Abonnés uniquement</label></div>
+              <div class="mode"><label class="check"><input type="checkbox" data-mode="emote_mode"> 😀 Emotes uniquement</label></div>
+              <div class="mode"><label class="check"><input type="checkbox" data-mode="unique_chat_mode"> 🔁 Messages uniques</label></div>
+              <div class="mode"><label class="check"><input type="checkbox" data-mode="non_moderator_chat_delay"> ⏱️ Délai pour les non-modos</label>
+                <select id="chatDelay"><option value="2">2 s</option><option value="4">4 s</option><option value="6">6 s</option></select></div>
+            </div>
+            <h3>Protection</h3>
+            <div class="row wrap">
+              <button class="btn ghost" id="shieldBtn">🛡️ Mode bouclier</button>
+              <button class="btn danger" id="clearBtn">🧹 Vider le chat</button>
+            </div>
+            <p class="muted">Le mode bouclier applique d'un coup les protections anti-raid haineux configurées sur Twitch.</p>
+          </div>
+
+          <!-- Modération -->
+          <div class="card">
+            <h3>Modération d'un viewer</h3>
+            <label>Pseudo<input id="modUser" placeholder="pseudo" autocomplete="off" list="chattersList"><datalist id="chattersList"></datalist></label>
+            <label>Raison <span class="muted">(facultatif, obligatoire pour un avertissement)</span><input id="modReason" placeholder="raison"></label>
+            <div class="row wrap">
+              <select id="toDur" style="width:auto"><option value="60">1 min</option><option value="300">5 min</option><option value="600" selected>10 min</option><option value="1800">30 min</option><option value="3600">1 h</option><option value="86400">24 h</option><option value="604800">7 jours</option><option value="1209600">14 jours</option></select>
+              <button class="btn ghost" data-mod="timeout">⏳ Timeout</button>
+              <button class="btn danger" data-mod="ban">🔨 Ban</button>
+              <button class="btn ghost" data-mod="unban">♻️ Unban</button>
+              <button class="btn ghost" data-mod="warn">⚠️ Avertir</button>
+            </div>
+            <h3>Rôles <span class="muted">(propriétaire uniquement)</span></h3>
+            <div class="row wrap">
+              <button class="btn ghost" data-role="mod">🗡️ Nommer modo</button>
+              <button class="btn ghost" data-role="unmod">Retirer modo</button>
+              <button class="btn ghost" data-role="vip">💎 Donner VIP</button>
+              <button class="btn ghost" data-role="unvip">Retirer VIP</button>
+            </div>
+            <details class="help"><summary>Modos et VIP actuels</summary><div id="roleLists" class="muted">—</div></details>
+          </div>
+
+          <!-- Raid & pubs -->
+          <div class="card">
+            <h3>Raid</h3>
+            <label>Chaîne à raider<div class="row"><input id="raidInput" placeholder="pseudo de la chaîne"><button class="btn" id="raidBtn">🚀 Lancer le raid</button></div></label>
+            <div class="row"><button class="btn ghost" id="unraidBtn">Annuler le raid en cours</button></div>
+            <h3>Publicités</h3>
+            <div class="row wrap" id="adBtns">
+              <button class="btn ghost" data-ad="30">30 s</button><button class="btn ghost" data-ad="60">1 min</button><button class="btn ghost" data-ad="90">1 min 30</button>
+              <button class="btn ghost" data-ad="120">2 min</button><button class="btn ghost" data-ad="150">2 min 30</button><button class="btn ghost" data-ad="180">3 min</button>
+            </div>
+            <div class="row wrap" style="margin-top:8px"><button class="btn ghost" id="snoozeBtn">😴 Repousser la prochaine pub (5 min)</button></div>
+            <div class="stats" id="adInfo"></div>
+          </div>
+
+          <!-- Sondage -->
+          <div class="card">
+            <h3>Sondage</h3>
+            <div id="pollActive"></div>
+            <div id="pollForm">
+              <label>Question<input id="pollTitle" maxlength="60" placeholder="Quel jeu ensuite ?"></label>
+              <div class="choices" id="pollChoices"></div>
+              <div class="row">
+                <label>Durée<select id="pollDur"><option value="60">1 min</option><option value="120" selected>2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="1800">30 min</option></select></label>
+                <label>Votes bonus <span class="muted">(points/vote, 0 = non)</span><input id="pollPoints" type="number" min="0" value="0"></label>
+              </div>
+              <button class="btn" id="pollStart">📊 Lancer le sondage</button>
+            </div>
+          </div>
+
+          <!-- Prédiction -->
+          <div class="card">
+            <h3>Prédiction</h3>
+            <div id="predActive"></div>
+            <div id="predForm">
+              <label>Question<input id="predTitle" maxlength="45" placeholder="Est-ce que je bats le boss ?"></label>
+              <div class="choices" id="predOutcomes"></div>
+              <label>Temps pour parier<select id="predWin"><option value="30">30 s</option><option value="60">1 min</option><option value="120" selected>2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="1800">30 min</option></select></label>
+              <button class="btn" id="predStart">🔮 Lancer la prédiction</button>
+            </div>
+          </div>
+
+          <!-- Aide-mémoire -->
+          <div class="card">
+            <h3>Commandes tapables dans le chat</h3>
+            <div class="cmds">
+              <code>/timeout pseudo 10m raison</code><code>/ban pseudo raison</code><code>/unban pseudo</code><code>/warn pseudo raison</code>
+              <code>/slow 30</code><code>/slowoff</code><code>/followers 10m</code><code>/followersoff</code>
+              <code>/subscribers</code><code>/subscribersoff</code><code>/emoteonly</code><code>/emoteonlyoff</code>
+              <code>/uniquechat</code><code>/uniquechatoff</code><code>/shieldmode</code><code>/shieldmodeoff</code>
+              <code>/clear</code><code>/announce msg</code><code>/announceblue msg</code><code>/so pseudo</code>
+              <code>/mod pseudo</code><code>/unmod pseudo</code><code>/vip pseudo</code><code>/unvip pseudo</code>
+              <code>/raid pseudo</code><code>/unraid</code><code>/commercial 60</code><code>/marker texte</code><code>/clip</code><code>/me action</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PLANNING ================= -->
+    <section class="tab" id="tab-planning">
+      <header class="bar">
+        <strong>Planning</strong>
+        <div class="bar-right">
+          <button class="btn ghost" id="planCopy">📋 Copier pour Discord</button>
+          <button class="btn" id="planSave">Enregistrer</button>
+        </div>
+      </header>
+      <div class="pad">
+        <div class="card plan-head">
+          <label>Titre<input id="planTitle"></label>
+          <label>Sous-titre<input id="planSubtitle"></label>
+          <label>Texte jour off<input id="planOff"></label>
+          <label>Couleur<input type="color" id="planAccent"></label>
+        </div>
+        <h3 class="section-title">Semaine type <span class="muted" id="planWeekLabel"></span></h3>
+        <div class="week" id="week"></div>
+        <h3 class="section-title">Événements ponctuels <span class="muted">(live spécial, annulation, marathon…)</span></h3>
+        <div class="card">
+          <div id="specials"></div>
+          <button class="btn ghost" id="addSpecial">＋ Ajouter un événement</button>
+        </div>
+        <h3 class="section-title">Aperçu overlay</h3>
+        <div class="preview checker"><iframe id="planPreview" src="/overlay/planning.html" data-w="1920" data-h="1080" title="Aperçu planning"></iframe></div>
+      </div>
+    </section>
+
+    <!-- ================= OBS ================= -->
+    <section class="tab" id="tab-obs">
+      <header class="bar">
+        <strong>Overlays OBS</strong>
+        <div class="bar-right"><span class="muted">Tester :</span>
+          <button class="btn small ghost" data-test="follow">Follow</button>
+          <button class="btn small ghost" data-test="sub">Abo</button>
+          <button class="btn small ghost" data-test="subgift">Abos offerts</button>
+          <button class="btn small ghost" data-test="raid">Raid</button>
+          <button class="btn small ghost" data-test="reward">Points</button>
+          <button class="btn small ghost" data-test="cheer">Bits</button>
+        </div>
+      </header>
+      <div class="pad">
+        <p class="muted">Dans OBS : <b>Sources → ＋ → Navigateur</b>, colle l'URL, règle la taille indiquée. Les overlays se mettent à jour en direct quand tu changes les réglages ici.</p>
+        <div class="overlays" id="overlayList"></div>
+        <div class="grid2">
+          <div class="card">
+            <h3>Overlay chat</h3>
+            <div class="form" id="formChat"></div>
+          </div>
+          <div class="card">
+            <h3>Alertes</h3>
+            <div class="form" id="formAlerts"></div>
+            <h3>Message mis en avant</h3>
+            <div class="form" id="formHl"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PARAMÈTRES ================= -->
+    <section class="tab" id="tab-settings">
+      <header class="bar"><strong>Réglages</strong></header>
+      <div class="pad grid2">
+        <div class="card">
+          <h3>Compte Twitch</h3>
+          <div id="authBox"></div>
+          <details class="help" id="esReport"><summary>Événements Twitch reçus (diagnostic)</summary><div id="esList" class="es-list">—</div></details>
+          <label>Client ID de ton appli Twitch<input id="clientId" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></label>
+          <label>Chaîne à suivre<input id="channel" placeholder="ta_chaine"></label>
+          <div class="row"><button class="btn" id="saveConfig">Enregistrer</button></div>
+          <details class="help">
+            <summary>Comment obtenir un Client ID ?</summary>
+            <ol>
+              <li>Va sur <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noopener">dev.twitch.tv/console/apps</a> → <b>Enregistrer votre application</b>.</li>
+              <li>Nom : ce que tu veux (ex. <i>GreenChat Maxime</i>). URL de redirection OAuth : <code>http://localhost</code>.</li>
+              <li>Catégorie : <i>Chat Bot</i>. Type de client : <b>Public</b> (important).</li>
+              <li>Copie le <b>Client ID</b> ici, enregistre, puis clique sur « Se connecter avec Twitch ».</li>
+            </ol>
+            <p>Sans connexion, le chat s'affiche quand même en lecture seule (pas d'envoi, pas de modération, pas de follows/points).</p>
+          </details>
+        </div>
+        <div class="card">
+          <h3>Chat</h3>
+          <label>Mots surlignés <span class="muted">(séparés par des virgules)</span><input id="hlWords" placeholder="greenheros, maxime"></label>
+          <label>Bots / utilisateurs masqués <span class="muted">(virgules)</span><input id="ignored"></label>
+          <label class="check"><input type="checkbox" id="sndFirst"> Son pour un premier message</label>
+          <label class="check"><input type="checkbox" id="sndMention"> Son pour une mention / mot surligné</label>
+          <label class="check"><input type="checkbox" id="sndEvent"> Son pour follow / abo / raid</label>
+          <div class="row"><button class="btn" id="saveChatSettings">Enregistrer</button></div>
+          <h3>Mode démo</h3>
+          <p class="muted">Génère de faux messages et événements pour régler tes overlays hors live.</p>
+          <button class="btn ghost" id="demoBtn">Activer la démo</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Fiche utilisateur -->
+<div class="modal" id="userModal" hidden>
+  <div class="modal-box">
+    <button class="x modal-close">✕</button>
+    <div class="ucard-head"><img id="ucAvatar" alt=""><div><h2 id="ucName"></h2><div class="muted" id="ucInfo"></div></div></div>
+    <div class="row wrap" id="ucActions">
+      <button class="btn small ghost" data-to="60">TO 1 min</button>
+      <button class="btn small ghost" data-to="600">TO 10 min</button>
+      <button class="btn small ghost" data-to="3600">TO 1 h</button>
+      <button class="btn small ghost" data-to="86400">TO 24 h</button>
+      <button class="btn small danger" id="ucBan">Ban</button>
+      <button class="btn small ghost" id="ucUnban">Unban</button>
+      <button class="btn small ghost" id="ucSo">Shoutout</button>
+      <a class="btn small ghost" id="ucProfile" target="_blank" rel="noopener">Profil Twitch ↗</a>
+    </div>
+    <h4>Messages de la session</h4>
+    <div class="uc-msgs" id="ucMsgs"></div>
+  </div>
+</div>
+
+<!-- Édition créneau -->
+<div class="modal" id="slotModal" hidden>
+  <div class="modal-box small">
+    <button class="x modal-close">✕</button>
+    <h2 id="slotModalTitle">Créneau</h2>
+    <div class="form">
+      <label id="slotDayWrap">Jour<select id="slotDay"></select></label>
+      <label id="slotDateWrap">Date<input type="date" id="slotDate"></label>
+      <div class="row"><label>Début<input type="time" id="slotStart"></label><label>Fin<input type="time" id="slotEnd"></label></div>
+      <label>Titre<input id="slotTitle" placeholder="Live du soir"></label>
+      <label>Jeu<input id="slotGame" placeholder="Phasmophobia"></label>
+      <label>Invité(e)<input id="slotGuest" placeholder="Mixmaixe"></label>
+      <label>Couleur <span class="muted">(vide = couleur du planning)</span><div class="row"><input type="color" id="slotColor"><button class="btn small ghost" id="slotColorReset">Par défaut</button></div></label>
+      <label class="check" id="slotCancelWrap"><input type="checkbox" id="slotCancelled"> Pas de live ce jour-là (annulation)</label>
+    </div>
+    <div class="row between">
+      <button class="btn danger" id="slotDelete">Supprimer</button>
+      <button class="btn" id="slotOk">Valider</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<script src="/js/common.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>GreenChat — message mis en avant</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; }
+  #wrap { position: absolute; padding: 40px; transform-origin: var(--origin, bottom left); }
+  #wrap.bottom-left { left: 0; bottom: 0; --origin: bottom left; }
+  #wrap.bottom-center { left: 50%; bottom: 0; translate: -50% 0; --origin: bottom center; }
+  #wrap.top-left { left: 0; top: 0; --origin: top left; }
+  #wrap.center { left: 50%; top: 50%; translate: -50% -50%; --origin: center; }
+  .card { display: flex; gap: 18px; align-items: center; max-width: 900px; background: rgba(12,14,18,.9); color: #fff; border-radius: 20px;
+          padding: 18px 26px 18px 18px; border-left: 6px solid var(--accent, #2ee59d); box-shadow: 0 10px 40px rgba(0,0,0,.5); animation: in .5s cubic-bezier(.2,1.4,.4,1); }
+  .card.out { animation: out .4s forwards; }
+  .avatar { width: 84px; height: 84px; border-radius: 50%; flex-shrink: 0; background: var(--accent, #2ee59d); display: grid; place-items: center;
+            font-size: 38px; font-weight: 900; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,.4); object-fit: cover; border: 3px solid var(--accent, #2ee59d); }
+  .name { font-weight: 800; font-size: 26px; }
+  .text { font-size: 30px; line-height: 1.35; overflow-wrap: anywhere; }
+  .emote { height: 1.5em; vertical-align: middle; margin: -0.25em 1px; }
+  .badge { height: 22px; vertical-align: -3px; margin-right: 4px; }
+  .mention, .at { font-weight: 700; }
+  @keyframes in { from { transform: translateY(40px) scale(.9); opacity: 0; } }
+  @keyframes out { to { transform: translateY(40px) scale(.9); opacity: 0; } }
+</style>
+<link rel="stylesheet" href="/css/overlay-custom.css">
+</head>
+<body>
+<div id="wrap" class="bottom-left"></div>
+<script src="/js/common.js"></script>
+<script>
+(() => {
+  const P = GC.params();
+  const wrap = document.getElementById('wrap');
+  let cfg = {}; let emotes = Object.create(null); let badges = {}; let timer = null; let currentId = null;
+
+  function apply(s) {
+    cfg = { ...s.overlayHighlight };
+    if (P.position) cfg.position = P.position;
+    wrap.className = cfg.position || 'bottom-left';
+    wrap.style.scale = String(Number(P.scale || cfg.scale) || 1);
+    document.documentElement.style.setProperty('--accent', s.accent);
+  }
+  function hide() {
+    const c = wrap.querySelector('.card'); currentId = null;
+    if (!c) return;
+    c.classList.add('out'); setTimeout(() => c.remove(), 400);
+  }
+  function show(h) {
+    clearTimeout(timer);
+    if (!h) return hide();
+    if (h.id === currentId) return;
+    wrap.innerHTML = ''; currentId = h.id;
+    const color = GC.nameColor(h.user);
+    const avatar = h.user?.avatar
+      ? `<img class="avatar" src="${GC.esc(h.user.avatar)}" alt="">`
+      : `<div class="avatar" style="background:${GC.esc(color)};border-color:${GC.esc(color)}">${GC.esc((h.user?.name || '?')[0].toUpperCase())}</div>`;
+    const body = h.type === 'event'
+      ? `${GC.eventInfo(h).icon} ${GC.eventInfo(h).html}${h.text ? '<br>' + GC.renderText(h.text, h.emotes, { emotes }) : ''}`
+      : GC.renderText(h.text, h.emotes, { emotes });
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `${avatar}<div><div class="name" style="color:${GC.esc(color)}">${GC.badgesHtml(h.user, badges)}${GC.esc(h.user?.name || '')}</div><div class="text">${body}</div></div>`;
+    wrap.appendChild(card);
+    if (cfg.duration > 0) timer = setTimeout(hide, cfg.duration * 1000);
+  }
+
+  GC.connect((m) => {
+    if (m.type === 'init') {
+      apply(m.settings); emotes = GC.toMap(m.emotes); badges = m.badges || {};
+      if (P.preview && !m.highlight) show({ id: 'preview', type: 'chat', user: { name: 'PixelPanda', color: '#ff6b6b', badges: [] }, text: 'Ce message est affiché sur le stream ! Kappa', emotes: '25:39-43' });
+      else show(m.highlight);
+    } else if (m.type === 'settings') apply(m.settings);
+    else if (m.type === 'emotes') emotes = GC.toMap(m.emotes);
+    else if (m.type === 'badges') badges = m.badges || {};
+    else if (m.type === 'highlight') show(m.highlight);
+  });
+})();
+</script>
+</body>
+</html>

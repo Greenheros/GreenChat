@@ -1,0 +1,10 @@
+/*
+ * CSS personnalisé pour TOUS les overlays (chat, alertes, mise en avant, planning).
+ * Ajoute tes règles ici, elles écrasent le style par défaut. Exemples :
+ *
+ *   .m { border-radius: 0; }                      -> overlay chat : messages carrés
+ *   .alert { font-family: "Bangers", cursive; }  -> alertes : autre police
+ *   h1 span { color: #ff9f43; }                   -> planning : couleur du dernier mot du titre
+ *
+ * Tu peux aussi coller du CSS dans le champ « CSS personnalisé » de la source navigateur OBS.
+ */

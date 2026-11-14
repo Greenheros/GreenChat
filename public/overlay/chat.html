@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>GreenChat — overlay chat</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; }
+  #list { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px; }
+  .m { color: var(--text, #fff); background: var(--bg, rgba(10,12,16,.55)); border-radius: 10px; padding: 6px 12px; line-height: 1.4; overflow-wrap: anywhere;
+       font-size: var(--fs, 22px); text-shadow: 0 1px 2px rgba(0,0,0,.8); transition: opacity .5s, transform .5s; }
+  .m.slide { animation: slide .35s ease-out; }
+  .m.fade { animation: fade .5s ease-out; }
+  .m.out { opacity: 0; transform: translateX(-20px); }
+  .name { font-weight: 800; }
+  .time { opacity: .6; font-size: .7em; margin-right: 4px; }
+  .badge { height: 1em; vertical-align: -0.12em; margin-right: 4px; }
+  .emote { height: 1.6em; vertical-align: middle; margin: -0.3em 1px; }
+  .mention, .at { font-weight: 700; }
+  .ev { border-left: 4px solid var(--accent, #2ee59d); }
+  .first { border-left: 4px solid #9147ff; }
+  .bits { border-left: 4px solid #f0a920; }
+  @keyframes slide { from { transform: translateX(-30px); opacity: 0; } }
+  @keyframes fade { from { opacity: 0; } }
+</style>
+<link rel="stylesheet" href="/css/overlay-custom.css" onerror="this.remove()">
+</head>
+<body>
+<div id="list"></div>
+<script src="/js/common.js"></script>
+<script>
+(() => {
+  const P = GC.params();
+  let cfg = {}; let emotes = Object.create(null); let badges = {}; let ignored = [];
+  const list = document.getElementById('list');
+
+  function apply(settings) {
+    cfg = { ...settings.overlayChat };
+    for (const k of Object.keys(cfg)) if (P[k] !== undefined) cfg[k] = typeof cfg[k] === 'number' ? Number(P[k]) : typeof cfg[k] === 'boolean' ? P[k] === '1' || P[k] === 'true' : P[k];
+    ignored = (settings.ignoredUsers || []).map((s) => s.toLowerCase());
+    const r = document.documentElement.style;
+    r.setProperty('--fs', cfg.fontSize + 'px'); r.setProperty('--bg', cfg.background); r.setProperty('--text', cfg.textColor); r.setProperty('--accent', settings.accent);
+    trim();
+  }
+  function trim() { while (list.children.length > (cfg.maxMessages || 12)) list.firstChild.remove(); }
+
+  function show(it, animate = true) {
+    let html = ''; let cls = 'm';
+    const time = cfg.showTime ? `<span class="time">${GC.pad(new Date(it.ts).getHours())}:${GC.pad(new Date(it.ts).getMinutes())}</span>` : '';
+    if (it.type === 'chat') {
+      if (cfg.hideCommands && (it.text || '').startsWith('!')) return;
+      if (cfg.hideBots && ignored.includes((it.user?.login || '').toLowerCase())) return;
+      if (it.firstMsg) cls += ' first';
+      if (it.bits) cls += ' bits';
+      const color = GC.nameColor(it.user);
+      html = time + (cfg.showBadges ? GC.badgesHtml(it.user, badges) : '') +
+        `<span class="name" style="color:${GC.esc(color)}">${GC.esc(it.user?.name)}</span>${it.isAction ? ' ' : ' : '}` +
+        `<span ${it.isAction ? `style="color:${GC.esc(color)};font-style:italic"` : ''}>${GC.renderText(it.text, it.emotes, { emotes })}</span>`;
+    } else if (it.type === 'event') {
+      if (!cfg.showEvents || !['follow', 'sub', 'subgift', 'raid', 'reward'].includes(it.kind)) return;
+      const info = GC.eventInfo(it);
+      cls += ' ev'; html = `${time}${info.icon} ${info.html}`;
+    } else return;
+    const el = document.createElement('div');
+    el.className = cls + (animate && cfg.animation !== 'none' ? ' ' + cfg.animation : '');
+    el.dataset.id = it.id; el.dataset.login = it.user?.login || '';
+    el.innerHTML = html;
+    list.appendChild(el); trim();
+    if (cfg.hideAfter > 0) {
+      const left = cfg.hideAfter * 1000 - (Date.now() - it.ts);
+      if (left <= 0) return el.remove();
+      setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 500); }, left);
+    }
+  }
+  const remove = (sel) => list.querySelectorAll(sel).forEach((el) => el.remove());
+
+  GC.connect((m) => {
+    switch (m.type) {
+      case 'init':
+        apply(m.settings); emotes = GC.toMap(m.emotes); badges = m.badges || {}; list.innerHTML = '';
+        if (P.preview && !m.history.length) {
+          const u = (name, color) => ({ name, login: name.toLowerCase(), color, badges: [] });
+          [[u('PixelPanda', '#ff6b6b'), 'Salut tout le monde !'], [u('LunaGamer', '#c56cf0'), 'GG c\'était propre Kappa'], [u('Toto_57', '#54a0ff'), 'On est combien ce soir ?']]
+            .forEach(([user, text], i) => show({ type: 'chat', id: 'p' + i, ts: Date.now(), user, text, emotes: text.includes('Kappa') ? '25:' + text.indexOf('Kappa') + '-' + (text.indexOf('Kappa') + 4) : '' }, false));
+        } else m.history.forEach((it) => (it.type === 'chat' || it.type === 'event') && show(it, false));
+        break;
+      case 'settings': apply(m.settings); break;
+      case 'emotes': emotes = GC.toMap(m.emotes); break;
+      case 'badges': badges = m.badges || {}; break;
+      case 'chat': case 'event': show(m); break;
+      case 'delete': remove(`[data-id="${CSS.escape(m.targetId)}"]`); break;
+      case 'clearUser': remove(`[data-login="${CSS.escape(m.login)}"]`); break;
+      case 'clear': list.innerHTML = ''; break;
+      default: break;
+    }
+  });
+})();
+</script>
+</body>
+</html>
