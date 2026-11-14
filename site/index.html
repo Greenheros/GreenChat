@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GreenChat — poste de contrôle Twitch</title>
+<meta name="description" content="GreenChat : chat Twitch multi-colonnes, modération, commandes admin, alertes et overlays OBS. 100 % local, gratuit.">
+<meta name="theme-color" content="#0e1014">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%232ee59d'/%3E%3Ctext x='32' y='45' font-family='Segoe UI,Arial' font-size='38' font-weight='900' text-anchor='middle' fill='%23062'%3EG%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+--accent: #2ee59d; --accent-ink: #04140c;
+--bg: #0b0d11; --bg2: #12151b; --bg3: #1a1e26; --line: #262b35;
+--text: #e8eaf0; --muted: #8b93a5; --purple: #9147ff; --red: #ff5c6c; --orange: #ffb648;
+--radius: 14px;
+color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+:root:not([data-theme="dark"]) {
+--accent: #12b877; --accent-ink: #ffffff;
+--bg: #f6f7f9; --bg2: #ffffff; --bg3: #eef0f4; --line: #dde1e8;
+--text: #151821; --muted: #5c6475;
+color-scheme: light;
+}
+}
+:root[data-theme="light"] {
+--accent: #12b877; --accent-ink: #ffffff;
+--bg: #f6f7f9; --bg2: #ffffff; --bg3: #eef0f4; --line: #dde1e8;
+--text: #151821; --muted: #5c6475;
+color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; overflow-x: hidden; }
+a { color: var(--accent); }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+.muted { color: var(--muted); }
+.nav { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 62px; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; color: var(--text); text-decoration: none; }
+.logo { width: 34px; height: 34px; border-radius: 10px; background: var(--accent); color: #062; display: grid; place-items: center; font-weight: 900; font-size: 19px; }
+.links { display: flex; gap: 22px; align-items: center; }
+.links a { color: var(--muted); text-decoration: none; font-size: 15px; }
+.links a:hover { color: var(--text); }
+@media (max-width: 760px) { .links a:not(.btn) { display: none; } }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; padding: 11px 20px; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; white-space: nowrap; transition: transform .15s, filter .15s; }
+.btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn.ghost { background: var(--bg3); color: var(--text); border: 1px solid var(--line); }
+.btn.small { padding: 7px 14px; font-size: 14px; }
+.btn[aria-disabled="true"] { opacity: .75; cursor: default; }
+.hero { padding: 72px 0 40px; position: relative; }
+.hero::before { content: ""; position: absolute; inset: -200px 0 auto; height: 600px; background: radial-gradient(600px 300px at 70% 30%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%), radial-gradient(500px 260px at 15% 10%, color-mix(in srgb, var(--purple) 14%, transparent), transparent 70%); z-index: -1; pointer-events: none; }
+.hero-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 48px; align-items: center; }
+@media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
+.tag { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); padding: 4px 12px; border-radius: 99px; }
+h1 { font-size: clamp(34px, 5.4vw, 56px); line-height: 1.08; margin: 18px 0 16px; letter-spacing: -0.02em; }
+h1 em { font-style: normal; color: var(--accent); }
+.lead { font-size: 19px; color: var(--muted); margin: 0 0 28px; max-width: 520px; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.cta small { display: block; width: 100%; color: var(--muted); font-size: 13px; }
+.mock { background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 30px 80px -20px #000a; overflow: hidden; font-size: 13px; }
+.mock-top { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--bg3); }
+.mock-top i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.mock-top span { margin-left: 8px; color: var(--muted); font-size: 12px; }
+.mock-body { display: grid; grid-template-columns: 52px 1fr 1fr; min-height: 340px; }
+.mock-side { background: var(--bg3); border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px 0; font-size: 17px; }
+.mock-side b { width: 30px; height: 30px; border-radius: 9px; background: var(--accent); color: #062; display: grid; place-items: center; font-size: 15px; margin-bottom: 6px; }
+.mock-col { border-right: 1px solid var(--line); min-width: 0; }
+.mock-col:last-child { border-right: 0; }
+.mock-col h4 { margin: 0; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+.m { padding: 5px 12px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m u { text-decoration: none; font-weight: 700; }
+.m.first { background: color-mix(in srgb, var(--purple) 16%, transparent); border-left: 3px solid var(--purple); }
+.m.hl { background: color-mix(in srgb, var(--accent) 14%, transparent); border-left: 3px solid var(--accent); }
+.ev { margin: 6px 8px; padding: 7px 10px; border-radius: 8px; background: var(--bg3); border-left: 3px solid var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev.sub { border-left-color: var(--purple); background: color-mix(in srgb, var(--purple) 14%, var(--bg3)); }
+.ev.raid { border-left-color: var(--red); background: color-mix(in srgb, var(--red) 12%, var(--bg3)); }
+.ev.poll { border-left-color: var(--orange); }
+@media (max-width: 560px) { .mock-body { grid-template-columns: 44px 1fr; } .mock-col.second { display: none; } }
+section { padding: 64px 0; }
+.sec-head { text-align: center; max-width: 680px; margin: 0 auto 40px; }
+.sec-head h2 { font-size: clamp(26px, 3.6vw, 36px); margin: 0 0 10px; letter-spacing: -0.01em; }
+.sec-head p { color: var(--muted); margin: 0; font-size: 17px; }
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.feat { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; transition: border-color .2s, transform .2s; }
+.feat:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); transform: translateY(-2px); }
+.feat .ico { font-size: 26px; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 12px; background: var(--bg3); margin-bottom: 12px; }
+.feat h3 { margin: 0 0 6px; font-size: 18px; }
+.feat p { margin: 0; color: var(--muted); font-size: 15px; }
+.obs { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+@media (max-width: 860px) { .obs { grid-template-columns: 1fr; } }
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.steps li { counter-increment: s; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px 16px 62px; position: relative; }
+.steps li::before { content: counter(s); position: absolute; left: 16px; top: 15px; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 800; display: grid; place-items: center; }
+.steps b { display: block; margin-bottom: 2px; }
+.steps span { color: var(--muted); font-size: 15px; }
+code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--bg3); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; font-size: .9em; color: var(--text); }
+table { width: 100%; border-collapse: collapse; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; font-size: 15px; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+th { background: var(--bg3); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+.tbl { overflow-x: auto; }
+.dl { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--bg2)), var(--bg2) 60%); border: 1px solid var(--line); border-radius: 20px; padding: 40px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; align-items: center; }
+@media (max-width: 820px) { .dl { grid-template-columns: 1fr; padding: 28px 20px; } }
+.dl h2 { margin: 0 0 8px; font-size: 30px; }
+.dl ul { margin: 12px 0 0; padding-left: 20px; color: var(--muted); }
+.dl-box { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; text-align: center; }
+.dl-box .ver { font-size: 13px; color: var(--muted); margin-top: 10px; }
+.soon { display: inline-block; font-size: 12px; font-weight: 700; color: var(--orange); background: color-mix(in srgb, var(--orange) 14%, transparent); padding: 2px 10px; border-radius: 99px; margin-bottom: 12px; }
+.faq { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+details { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius); padding: 0 18px; }
+summary { cursor: pointer; padding: 16px 0; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; color: var(--accent); font-size: 22px; line-height: 1; transition: transform .2s; }
+details[open] summary::after { transform: rotate(45deg); }
+details p { margin: 0 0 16px; color: var(--muted); }
+footer { border-top: 1px solid var(--line); padding: 28px 0; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
+.theme-btn { background: var(--bg3); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 10px; cursor: pointer; font: inherit; font-size: 14px; }
+</style>
+</head>
+<body>
+<header class="nav">
+<div class="wrap">
+<a class="brand" href="#"><span class="logo">G</span>GreenChat</a>
+<nav class="links">
+<a href="#fonctions">Fonctions</a>
+<a href="#obs">OBS</a>
+<a href="#faq">FAQ</a>
+<a class="btn small" href="#telecharger">Télécharger</a>
+</nav>
+</div>
+</header>
+<main>
+<div class="hero">
+<div class="wrap hero-grid">
+<div>
+<span class="tag">💚 Gratuit · 100 % local · en français</span>
+<h1>Ton live Twitch,<br><em>sous contrôle.</em></h1>
+<p class="lead">GreenChat réunit ton chat, ta modération, tes commandes de streamer et tes overlays OBS dans un seul panneau, qui tourne sur ton PC.</p>
+<div class="cta">
+<a class="btn" href="#telecharger">⬇️ Télécharger</a>
+<a class="btn ghost" href="#fonctions">Découvrir les fonctions</a>
+<small>Windows · s'utilise comme dock dans OBS Studio</small>
+</div>
+</div>
+<div class="mock" aria-label="Aperçu de l'interface GreenChat" role="img">
+<div class="mock-top"><i></i><i></i><i></i><span>GreenChat — poste de contrôle</span></div>
+<div class="mock-body">
+<div class="mock-side"><b>G</b>💬<span>🎬</span><span>📅</span><span>🖥️</span><span>⚙️</span></div>
+<div class="mock-col">
+<h4>Chat <span class="muted">⚙️</span></h4>
+<div class="m"><u style="color:#ff6b6b">PixelPanda</u> : Salut tout le monde !</div>
+<div class="m first"><u style="color:#54a0ff">Toto_57</u> : Première fois ici, trop bien 😍</div>
+<div class="m"><u style="color:#c56cf0">LunaGamer</u> : GG c'était propre</div>
+<div class="ev">💚 <b>NoobMaster</b> suit la chaîne !</div>
+<div class="m hl"><u style="color:#1dd1a1">ModoZen</u> : @streamer prochain jeu ?</div>
+<div class="m"><u style="color:#feca57">ChefTartiflette</u> : Courage pour le boss !</div>
+<div class="ev sub">⭐ <b>PixelPanda</b> se réabonne — <b>12 mois</b> !</div>
+<div class="m"><u style="color:#ff9f43">Bob_le_Bricoleur</u> : mdr la tête du perso</div>
+</div>
+<div class="mock-col second">
+<h4>Activité <span class="muted">⚙️</span></h4>
+<div class="ev raid">🚀 <b>CoolStreamer</b> débarque en raid avec <b>42</b> viewers !</div>
+<div class="ev poll">📊 Sondage terminé : <b>Quel jeu ensuite ?</b></div>
+<div class="ev">🎯 <b>LunaGamer</b> utilise « Hydrate-toi ! »</div>
+<div class="ev sub">🎁 <b>ChefTartiflette</b> offre <b>5</b> abos !</div>
+<div class="ev">🔮 Prédiction terminée — 🏆 <b>Oui</b></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<section id="fonctions">
+<div class="wrap">
+<div class="sec-head">
+<h2>Tout ce qu'il faut pendant un live</h2>
+<p>Pensé par un streamer, pour les streamers : rapide, lisible, et sans abonnement.</p>
+</div>
+<div class="features">
+<article class="feat"><div class="ico">💬</div><h3>Chat multi-colonnes</h3><p>Autant de colonnes que tu veux, chacune avec ses filtres : messages, mentions, premiers messages, événements, modération… et sa couleur.</p></article>
+<article class="feat"><div class="ico">😀</div><h3>Toutes les emotes</h3><p>Emotes Twitch, 7TV, BTTV et FFZ, badges, réponses, recherche et complétion des pseudos avec Tab.</p></article>
+<article class="feat"><div class="ico">🛡️</div><h3>Modération en un clic</h3><p>Timeout, ban, avertissement, suppression, mode lent, followers, abonnés, emotes uniquement, mode bouclier… depuis le chat ou un panneau dédié.</p></article>
+<article class="feat"><div class="ico">🎬</div><h3>Commandes de streamer</h3><p>Titre, catégorie et tags, raids, pubs, marqueurs, clips, VIP et modos, annonces en couleur : toutes les commandes admin au même endroit.</p></article>
+<article class="feat"><div class="ico">📊</div><h3>Sondages et prédictions</h3><p>Lance-les, suis les résultats en direct, ferme les paris et désigne le gagnant sans quitter ton panneau.</p></article>
+<article class="feat"><div class="ico">🔔</div><h3>Alertes et événements</h3><p>Follows, abos, abos offerts, bits, raids, points de chaîne, train de la hype, objectifs, shoutouts… avec sons de notification.</p></article>
+<article class="feat"><div class="ico">⭐</div><h3>Message à l'écran</h3><p>Mets en avant le message d'un viewer sur ton stream en un clic, avec son avatar.</p></article>
+<article class="feat"><div class="ico">📅</div><h3>Planning de la semaine</h3><p>Semaine type, événements ponctuels, overlay planning pour OBS et bouton « Copier pour Discord ».</p></article>
+<article class="feat"><div class="ico">🔒</div><h3>100 % local</h3><p>Tout tourne sur ton PC. Ta connexion Twitch reste chez toi : aucun serveur tiers, aucune donnée revendue.</p></article>
+</div>
+</div>
+</section>
+<section id="obs">
+<div class="wrap">
+<div class="sec-head">
+<h2>Directement dans OBS Studio</h2>
+<p>GreenChat s'ancre dans OBS comme un panneau, et fournit des overlays prêts à l'emploi.</p>
+</div>
+<div class="obs">
+<div>
+<h3>Ajouter le panneau dans OBS</h3>
+<ol class="steps">
+<li><b>Installe et lance GreenChat</b><span>Connecte ton compte Twitch en deux clics depuis l'onglet Réglages.</span></li>
+<li><b>Ouvre Docks → Docks de navigateur personnalisés</b><span>Dans la barre de menus d'OBS Studio.</span></li>
+<li><b>Ajoute <code>http://localhost:3500</code></b><span>Donne-lui un nom, par exemple « GreenChat », puis Appliquer.</span></li>
+<li><b>Place le panneau où tu veux</b><span>À côté de tes scènes, sur un deuxième écran… il se souvient de sa position.</span></li>
+</ol>
+</div>
+<div>
+<h3>Overlays (Sources → Navigateur)</h3>
+<div class="tbl">
+<table>
+<thead><tr><th>Overlay</th><th>Adresse</th><th>Taille</th></tr></thead>
+<tbody>
+<tr><td>💬 Chat</td><td><code>/overlay/chat.html</code></td><td>450 × 800</td></tr>
+<tr><td>🔔 Alertes</td><td><code>/overlay/alerts.html</code></td><td>1920 × 1080</td></tr>
+<tr><td>⭐ Message mis en avant</td><td><code>/overlay/highlight.html</code></td><td>1920 × 1080</td></tr>
+<tr><td>📅 Planning</td><td><code>/overlay/planning.html</code></td><td>1920 × 1080</td></tr>
+</tbody>
+</table>
+</div>
+<p class="muted">Les overlays se mettent à jour en direct quand tu changes les réglages, et un mode démo génère un faux chat pour les régler hors live.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="telecharger">
+<div class="wrap">
+<div class="dl">
+<div>
+<h2>Télécharger GreenChat</h2>
+<p class="muted">Gratuit, sans compte à créer en plus de Twitch.</p>
+<ul>
+<li>Windows 10 ou 11</li>
+<li>OBS Studio 28 ou plus récent (pour le dock)</li>
+<li>Un compte Twitch</li>
+</ul>
+</div>
+<div class="dl-box">
+<span class="soon">BIENTÔT DISPONIBLE</span><br>
+<!-- Remplacer href par le lien de l'installateur quand il sera prêt, et retirer aria-disabled -->
+<a class="btn" href="#telecharger" aria-disabled="true">⬇️ GreenChat pour Windows</a>
+<div class="ver">L'installateur arrive très prochainement.</div>
+</div>
+</div>
+</div>
+</section>
+<section id="faq">
+<div class="wrap">
+<div class="sec-head"><h2>Questions fréquentes</h2></div>
+<div class="faq">
+<details><summary>GreenChat est-il gratuit ?</summary><p>Oui, entièrement. Pas d'abonnement, pas de fonctions payantes.</p></details>
+<details><summary>Mes données passent-elles par un serveur ?</summary><p>Non. GreenChat tourne sur ton PC et parle directement à Twitch. Ton jeton de connexion est enregistré uniquement sur ta machine.</p></details>
+<details><summary>Est-ce que je peux l'utiliser depuis un autre PC ?</summary><p>Oui : si GreenChat tourne sur un mini-PC ou un PC dédié, ouvre <code>http://IP-du-PC:3500</code> depuis le PC de stream, sur ton réseau local.</p></details>
+<details><summary>Faut-il être affilié ou partenaire ?</summary><p>Non pour le chat, la modération et les overlays. Les sondages, prédictions et publicités demandent par contre une chaîne affiliée ou partenaire : c'est une règle de Twitch.</p></details>
+<details><summary>Est-ce que ça marche avec Streamlabs Desktop ?</summary><p>Les overlays, oui (source navigateur). Le panneau peut être ouvert dans n'importe quel navigateur à côté.</p></details>
+</div>
+</div>
+</section>
+</main>
+<footer>
+<div class="wrap">
+<span>💚 GreenChat — fait avec amour pour les streamers.</span>
+<span>Twitch est une marque de Twitch Interactive, Inc. GreenChat n'est pas affilié à Twitch.
+<button class="theme-btn" id="themeBtn" type="button" aria-label="Changer de thème">🌓</button></span>
+</div>
+</footer>
+<script>
+(function () {
+const root = document.documentElement;
+try { const t = localStorage.getItem('gc-theme'); if (t) root.dataset.theme = t; } catch (e) {}
+document.getElementById('themeBtn').addEventListener('click', function () {
+const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+root.dataset.theme = dark ? 'light' : 'dark';
+try { localStorage.setItem('gc-theme', root.dataset.theme); } catch (e) {}
+});
+})();
+</script>
+</body>
+</html>
