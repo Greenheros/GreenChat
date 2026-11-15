@@ -17,6 +17,7 @@ Chat multi-colonnes, modération, commandes de streamer, sondages, alertes et ov
 - [Dépannage](#-dépannage)
 - [Structure du projet](#-structure-du-projet)
 - [Feuille de route](#-feuille-de-route)
+- [Licence](#-licence)
 
 ---
 
@@ -124,7 +125,7 @@ greenchat/
 │   ├── js/              app.js (panneau), common.js (partagé avec les overlays)
 │   ├── css/             app.css, overlay-custom.css
 │   └── overlay/         chat, alerts, highlight, planning
-├── site/                Page vitrine du projet
+├── LICENSE              Licence MIT
 └── data/                Créé au premier lancement, jamais publié (voir .gitignore)
 ```
 
@@ -138,6 +139,12 @@ greenchat/
 - [ ] Assistant de première configuration
 - [ ] Vue « dock » compacte pour les panneaux étroits d'OBS
 - [ ] Pilotage d'OBS via obs-websocket (changement de scène sur raid ou pub…)
+
+---
+
+## 📄 Licence
+
+GreenChat est distribué sous **licence MIT** : tu peux l'utiliser, le modifier et le partager librement, à condition de garder la mention de copyright. Voir [LICENSE](LICENSE).
 
 ---
 

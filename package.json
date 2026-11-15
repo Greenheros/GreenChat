@@ -1,6 +1,7 @@
 {
   "name": "greenchat",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "Chat Twitch local façon Twitchat + overlays OBS + planning",
   "main": "server.js",
   "scripts": {
