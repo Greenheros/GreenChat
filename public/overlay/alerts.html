@@ -63,7 +63,8 @@
       if (P.preview) { cfg = { ...cfg, sound: false, duration: 3600 }; enqueue({ type: 'event', kind: 'follow', user: { name: 'Viewer_Test' } }); }
     } else if (m.type === 'settings') { if (!P.preview) cfg = m.settings.alerts; }
     else if (m.type === 'emotes') emotes = GC.toMap(m.emotes);
-    else if (ready && !P.preview && (m.type === 'event' || (m.type === 'chat' && m.bits > 0))) enqueue(m);
+    // chat partagé : pas d'alerte pour les abos / bits / raids reçus par les chaînes partenaires
+    else if (ready && !P.preview && !m.source && (m.type === 'event' || (m.type === 'chat' && m.bits > 0))) enqueue(m);
   });
 })();
 </script>

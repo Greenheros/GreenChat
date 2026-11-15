@@ -25,11 +25,11 @@ Chat multi-colonnes, modération, commandes de streamer, sondages, alertes et ov
 
 | Onglet | Ce qu'on peut faire |
 |---|---|
-| 💬 **Chat** | Colonnes illimitées, chacune avec son **panneau de filtres** : messages (mentions, premiers messages, modos/VIP, abonnés), follows, abos, bits, raids, points de chaîne, sondages, prédictions, train de la hype, objectifs, modération… Aperçu de chaque type, préréglages, couleur de fond. Emotes Twitch, 7TV, BTTV et FFZ, badges, réponses, recherche, complétion des pseudos avec Tab. Au survol d'un message : ⭐ afficher sur le stream, répondre, copier, supprimer, timeout, ban. Clic sur un pseudo : fiche du viewer. |
+| 💬 **Chat** | Colonnes illimitées, chacune avec son **panneau de filtres** : messages (mentions, premiers messages, modos/VIP, abonnés), follows, abos, bits, raids, points de chaîne, sondages, prédictions, train de la hype, objectifs, modération… Aperçu de chaque type, préréglages, couleur de fond. Emotes Twitch, 7TV, BTTV et FFZ, badges, réponses, recherche, complétion des pseudos avec Tab. Au survol d'un message : ⭐ afficher sur le stream, répondre, copier, supprimer, timeout, ban. Clic sur un pseudo : fiche du viewer. **Chat partagé** : bandeau des chaînes participantes, pastille d'origine sur chaque message, filtre « Origine » par colonne. |
 | 🎬 **Stream** | Titre, catégorie et tags. Shoutout, annonces en couleur, marqueurs, clips. **Commandes admin** : modes du chat (lent, followers, abonnés, emotes, messages uniques, délai), mode bouclier, vider le chat, timeout/ban/unban/avertissement, modos et VIP, raid, publicités, sondages et prédictions avec résultats en direct. |
 | 📅 **Planning** | Semaine type, événements ponctuels (live spécial, annulation), overlay planning et bouton **Copier pour Discord**. |
 | 🖥️ **OBS** | Adresses des overlays, aperçus, réglages en direct, boutons de test des alertes. |
-| ⚙️ **Réglages** | Compte Twitch, mots surlignés, bots masqués, sons de notification, mode démo, diagnostic des événements Twitch reçus. |
+| ⚙️ **Réglages** | Compte Twitch, mots surlignés, bots masqués, sons de notification, mode démo, simulation de chat partagé, diagnostic des événements Twitch reçus. |
 
 ---
 
@@ -84,6 +84,7 @@ Si une mise à jour demande de nouvelles autorisations, un bandeau orange appara
 Les réglages peuvent être forcés dans l'adresse, par exemple `chat.html?fontSize=28&hideAfter=30` ou `highlight.html?position=bottom-center`.
 Le style de tous les overlays se personnalise dans `public/css/overlay-custom.css`.
 Le **mode démo** (Réglages) génère un faux chat pour régler les overlays hors live.
+Pendant un **chat partagé**, l'overlay chat affiche les messages des chaînes partenaires avec leur pastille (`chat.html?showShared=0` pour les masquer). Les abos, bits et raids des partenaires ne déclenchent jamais tes alertes.
 
 ---
 

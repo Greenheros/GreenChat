@@ -8,6 +8,7 @@
     status: {}, settings: {}, planning: { slots: [], specials: [] },
     emotes: Object.create(null), badges: {}, highlight: null,
     items: [], byId: new Map(), replyTo: null,
+    shared: null, channels: {},
   };
   const local = JSON.parse(localStorage.getItem('gc.local') || '{}');
   const saveLocal = () => localStorage.setItem('gc.local', JSON.stringify(local));
@@ -58,9 +59,10 @@
       case 'init':
         S.status = m.status; S.settings = m.settings; S.planning = m.planning;
         S.emotes = GC.toMap(m.emotes); S.badges = m.badges || {}; S.highlight = m.highlight;
+        S.shared = m.shared || null; S.channels = m.channels || {};
         S.items = []; S.byId.clear();
         (m.history || []).forEach((it) => addItem(it, false));
-        applyStatus(); fillSettings(); renderColumns(); renderPlanning(); renderObs(); renderOnscreen();
+        applyStatus(); fillSettings(); renderColumns(); renderPlanning(); renderObs(); renderOnscreen(); renderShared();
         maybeAutoWizard();
         break;
       case 'status': S.status = m.status; applyStatus(); break;
@@ -68,6 +70,8 @@
       case 'planning': if (!planDirty) { S.planning = m.planning; renderPlanning(); } break;
       case 'emotes': S.emotes = GC.toMap(m.emotes); break;
       case 'badges': S.badges = m.badges || {}; break;
+      case 'shared': S.shared = m.shared; S.channels = m.channels || S.channels; renderShared(); break;
+      case 'channels': S.channels = m.channels || {}; renderShared(); clearTimeout(chanT); chanT = setTimeout(renderColumns, 400); break;
       case 'highlight': S.highlight = m.highlight; renderOnscreen(); break;
       case 'auth':
         if (m.ok) { toast('Connecté à Twitch en tant que ' + m.login); renderAuth(); onAuthHooks.forEach((f) => f()); }
@@ -80,6 +84,7 @@
     }
   }
 
+  let chanT = null;
   function setDot(sel, st) { const d = $(sel); d.className = 'dot ' + (st || ''); }
   function applyStatus() {
     const st = S.status;
@@ -121,7 +126,7 @@
     if (it.type === 'clearUser') {
       S.items.forEach((x) => { if (x.type === 'chat' && x.user?.login === it.login) x.deleted = true; });
       $$(`.msg[data-login="${CSS.escape(it.login)}"]`).forEach((el) => el.classList.add('deleted'));
-      it = { ...it, type: 'notice', text: it.duration ? `${it.login} a été exclu ${fmtDur(it.duration)}` : `${it.login} a été banni` , mod: true, cat: 'ban' };
+      it = { ...it, type: 'notice', text: (it.duration ? `${it.login} a été exclu ${fmtDur(it.duration)}` : `${it.login} a été banni`) + (it.source ? ' chez ' + GC.srcName(it.source, S.channels) : ''), mod: true, cat: 'ban' };
     }
     if (it.type === 'clear') it = { ...it, type: 'notice', text: 'Le chat a été vidé par un modérateur', mod: true, cat: 'clear' };
     it._mention = isMention(it);
@@ -133,6 +138,7 @@
 
   function sounds(it) {
     if (it.demo && !it.test) return;
+    if (it.type === 'event' && it.source) return;
     if (it.type === 'chat' && it.firstMsg && local.sndFirst) GC.ding(0.3, [660, 990]);
     else if (it._mention && local.sndMention) GC.ding(0.3, [990, 1320]);
     else if (it.type === 'event' && local.sndEvent && it.kind !== 'ad') GC.ding(0.3, [523, 659, 784]);
@@ -167,6 +173,7 @@
     { group: 'Stream' },
     { k: 'stream', icon: '🟢', label: 'Live commencé / terminé' },
     { k: 'ad', icon: '📺', label: 'Publicités' },
+    { k: 'shared', icon: '🔗', label: 'Chat partagé (début, arrivées, fin)' },
     { k: 'notice', icon: 'ℹ️', label: 'Infos système Twitch' },
   ];
   const CAT_KEYS = CATS.filter((c) => c.k).map((c) => c.k);
@@ -204,8 +211,17 @@
     if (!flags.length) return true;
     return (o.mentions && it._mention) || (o.first && it.firstMsg) || (o.mods && (it.user?.mod || it.user?.vip)) || (o.subs && it.user?.sub);
   }
+  // origine : toutes les chaînes, la mienne, les partenaires du chat partagé ou une chaîne précise
+  function srcPasses(col, it) {
+    const v = col.src || 'all';
+    if (v === 'all') return true;
+    if (v === 'mine') return !it.source;
+    if (v === 'partners') return !!it.source;
+    return it.source?.roomId === v;
+  }
   function passes(col, it) {
     const f = col.f || {};
+    if (!srcPasses(col, it)) return false;
     const q = ($('#search').value || '').trim().toLowerCase();
     if (it.type === 'chat') {
       if (q && !(it.text || '').toLowerCase().includes(q) && !(it.user?.login || '').includes(q) && !(it.user?.name || '').toLowerCase().includes(q)) return false;
@@ -235,13 +251,14 @@
       if (it.deleted) cls.push('deleted');
       if (it.self) cls.push('self');
       if (isBot(it)) cls.push('bot');
+      if (it.source) cls.push('shared');
       if (S.highlight && S.highlight.id === it.id) cls.push('onscreen-now');
       el.className = cls.join(' ');
       el.dataset.id = it.id; el.dataset.login = it.user?.login || '';
       const color = GC.nameColor(it.user);
       el.innerHTML =
         (it.reply ? `<div class="reply">↪ en réponse à <b>@${esc(it.reply.name)}</b> : ${esc(it.reply.text)}</div>` : '') +
-        `<span class="time">${time(it.ts)}</span>${GC.badgesHtml(it.user, S.badges)}` +
+        `<span class="time">${time(it.ts)}</span>${GC.srcHtml(it.source, S.channels)}${GC.badgesHtml(it.source ? { badges: it.source.badges } : it.user, S.badges, it.source?.roomId)}` +
         `<span class="user" data-a="user" style="color:${esc(color)}">${esc(it.user?.name)}</span>${it.isAction ? ' ' : '<span class="sep">: </span>'}` +
         (it.bits ? `<b style="color:#f0a920">🔷 ${it.bits} bits </b>` : '') +
         `<span class="text" ${it.isAction ? `style="color:${esc(color)}"` : ''}>${GC.renderText(it.text, it.emotes, { emotes: S.emotes, linkify: true, mentionLogin: mentionLogin() })}</span>` +
@@ -257,7 +274,9 @@
       const info = GC.eventInfo(it);
       el.className = 'event ' + it.kind;
       el.dataset.id = it.id;
+      if (it.source) el.classList.add('from-partner');
       el.innerHTML = `<span class="time">${time(it.ts)}</span> ${info.icon} ${info.html}` +
+        (it.source ? ` <span class="src-tag">${GC.srcHtml(it.source, S.channels)}chez ${esc(GC.srcName(it.source, S.channels))}</span>` : '') +
         (it.text ? `<div class="ev-text">${GC.renderText(it.text, it.emotes, { emotes: S.emotes })}</div>` : '') +
         (it.user && it.kind !== 'ad' ? `<div class="acts"><button data-a="hl" title="Afficher sur le stream">⭐</button></div>` : '');
       el.style.position = 'relative';
@@ -314,6 +333,9 @@
           <select data-fp="preset"><option value="">⚡ Préréglages…</option>${Object.entries(PRESETS).map(([k, p]) => `<option value="${k}">${esc(p.label)}</option>`).join('')}</select>
           <span class="fp-all">Tout ${sw('__all', all)}</span>
         </div>
+        <label class="fp-src">🔗 Origine <span class="muted">(utile pendant un chat partagé)</span>
+          <select data-fp="src">${srcOptions(col.src || 'all')}</select>
+        </label>
       </div>
       <div class="fp-list">
         <div class="fp-row msgrow ${f.messages ? 'on' : ''}">
@@ -338,6 +360,12 @@
         </div>
       </div>`;
   }
+  function srcOptions(cur) {
+    const opts = [['all', 'Toutes les chaînes'], ['mine', 'Ma chaîne uniquement'], ['partners', 'Chaînes partenaires uniquement']];
+    Object.values(S.channels).filter((ch) => ch.id !== S.status.roomId && ch.id !== 'demo-me').forEach((ch) => opts.push([ch.id, 'Seulement ' + (ch.name || ch.login || ch.id)]));
+    if (!opts.some(([v]) => v === cur)) opts.push([cur, 'Seulement une chaîne partenaire']);
+    return opts.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('');
+  }
   function applyBg(c, col) {
     $('.feed', c).style.background = col.bg ? `color-mix(in srgb, ${col.bg} 14%, transparent)` : '';
     $('.col-head', c).style.boxShadow = col.bg ? `inset 0 -2px 0 ${col.bg}` : '';
@@ -360,6 +388,7 @@
         toast(`Préréglage « ${pr.label} » appliqué`); return rerender();
       }
       if (t.matches('[data-bg-custom]')) { col.bg = t.value; return rerender(); }
+      if (t.dataset.fp === 'src') { col.src = t.value; saveCols(); return refreshColumn(c, col); }
     });
     p.addEventListener('click', (e) => {
       if (e.target.closest('[data-fp=close]')) { p.hidden = true; return; }
@@ -393,7 +422,8 @@
       shoutout: ev({ kind: 'shoutout', phase: 'out', viewers: 57 }), unban: ev({ kind: 'unban', by: 'ModoZen' }),
       unbanrequest: ev({ kind: 'unbanrequest', text: 'Désolé pour hier, je ne recommencerai pas' }),
       warn: ev({ kind: 'warn', by: 'ModoZen', reason: 'Pas de spoil' }), shield: ev({ kind: 'shield', phase: 'on', by: 'ModoZen', user: null }),
-      stream: ev({ kind: 'stream', phase: 'online', user: null }), ad: ev({ kind: 'ad', duration: 90, manual: true, user: null }),
+      stream: ev({ kind: 'stream', phase: 'online', user: null }),
+      shared: ev({ kind: 'shared', phase: 'begin', partners: ['NovaStream', 'PoutineTV'], host: '', user: null }), ad: ev({ kind: 'ad', duration: 90, manual: true, user: null }),
       ban: { ...base, type: 'notice', text: 'viewer_test a été exclu 10 min', cat: 'ban' },
       clear: { ...base, type: 'notice', text: 'Le chat a été vidé par un modérateur', cat: 'clear' },
       notice: { ...base, type: 'notice', text: 'Ce salon est maintenant en mode lent (30 s).' },
@@ -432,7 +462,7 @@
     const btn = e.target.closest('[data-a]'); if (!btn) return;
     const el = btn.closest('[data-id]'); const it = el && S.byId.get(el.dataset.id); if (!it) return;
     const a = btn.dataset.a;
-    if (a === 'user') return openUser(it.user);
+    if (a === 'user') return openUser(it.user, it.source);
     if (a === 'hl') return run(api('POST', '/api/highlight', { message: it }), 'Affiché sur le stream');
     if (a === 'reply') { S.replyTo = it; $('#replying').hidden = false; $('#replyingText').textContent = 'Réponse à ' + it.user.name + ' : ' + it.text.slice(0, 80); $('#msgInput').focus(); return; }
     if (a === 'copy') return copyText(it.text).then(() => toast('Copié'), () => toast('Copie impossible', true));
@@ -460,8 +490,14 @@
 
   /* ---------------- Fiche utilisateur ---------------- */
   let ucUser = null;
-  async function openUser(user) {
+  async function openUser(user, source = null) {
     ucUser = user;
+    const ucs = $('#ucShared');
+    ucs.hidden = !source;
+    if (source) {
+      const n = esc(GC.srcName(source, S.channels));
+      ucs.innerHTML = `🔗 Viewer venu de <b>${n}</b> (chat partagé). Ban, timeout et suppression ne s'appliquent qu'à <b>ta</b> chaîne : ses messages disparaissent chez toi, pas chez ${n}.`;
+    }
     $('#ucName').textContent = user.name; $('#ucName').style.color = GC.nameColor(user);
     $('#ucAvatar').src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; $('#ucInfo').textContent = '';
     $('#ucProfile').href = 'https://twitch.tv/' + encodeURIComponent(user.login);
@@ -904,6 +940,7 @@
       ['textColor', 'Couleur du texte', 'color'], ['animation', 'Animation', 'select', { slide: 'Glissement', fade: 'Fondu', none: 'Aucune' }],
       ['showBadges', 'Afficher les badges', 'checkbox'], ['showEvents', 'Afficher follows / abos / raids', 'checkbox'],
       ['hideCommands', 'Masquer les commandes (!xxx)', 'checkbox'], ['hideBots', 'Masquer les bots', 'checkbox'], ['showTime', 'Afficher l\'heure', 'checkbox'],
+      ['showShared', 'Chat partagé : afficher les messages des chaînes partenaires', 'checkbox'],
     ]);
     buildForm('#formAlerts', 'alerts', [
       ['duration', 'Durée d\'affichage (s)', 'number'], ['follow', 'Follows', 'checkbox'], ['sub', 'Abonnements', 'checkbox'],
@@ -988,6 +1025,7 @@
     'channel.charity_campaign.donate': 'Dons caritatifs', 'stream.online': 'Live commencé', 'stream.offline': 'Live terminé',
     'channel.shoutout.create': 'Shoutout envoyé', 'channel.shoutout.receive': 'Shoutout reçu', 'channel.shield_mode.begin': 'Bouclier activé',
     'channel.shield_mode.end': 'Bouclier désactivé', 'channel.unban': 'Unbans', 'channel.unban_request.create': 'Demandes de déban', 'channel.warning.send': 'Avertissements',
+    'channel.shared_chat.begin': 'Chat partagé (début)', 'channel.shared_chat.update': 'Chat partagé (changement)', 'channel.shared_chat.end': 'Chat partagé (fin)',
   };
   async function loadEsReport() {
     try {
@@ -1008,6 +1046,34 @@
       .then((s) => { S.settings = s; renderColumns(); });
   });
   $('#demoBtn').addEventListener('click', () => run(api('POST', '/api/demo', { on: !S.status.demo })));
+  $('#demoSharedBtn').addEventListener('click', () => run(api('POST', '/api/demo-shared', { on: !S.shared?.demo })));
+
+  /* ---------------- Chat partagé : bandeau ---------------- */
+  function renderShared() {
+    const bar = $('#sharedBar'); const sh = S.shared;
+    // met à jour la liste « Origine » des panneaux de filtres déjà ouverts
+    $$('.col').forEach((c) => {
+      const col = columns.find((x) => x.id === c.dataset.col); const sel = $('[data-fp=src]', c);
+      if (col && sel) sel.innerHTML = srcOptions(col.src || 'all');
+    });
+    $('#demoSharedBtn').textContent = sh?.demo ? 'Arrêter la simulation' : 'Simuler un chat partagé';
+    bar.hidden = !sh;
+    if (!sh) { bar.innerHTML = ''; return; }
+    const me = S.status.roomId || 'demo-me';
+    const chip = (id) => {
+      const ch = S.channels[id] || { id, name: 'Chaîne inconnue' };
+      const pic = ch.avatar ? `<img src="${esc(ch.avatar)}" alt="">` : `<span class="src-txt" style="background:${esc(GC.srcColor(ch))}">${esc((ch.name || '?').charAt(0).toUpperCase())}</span>`;
+      const tags = (id === me ? ' <small>toi</small>' : '') + (id === sh.hostId ? ' <small class="host">hôte</small>' : '');
+      const link = ch.login && !String(id).startsWith('demo') ? ` href="https://twitch.tv/${encodeURIComponent(ch.login)}" target="_blank" rel="noopener"` : '';
+      return `<a class="sh-chip"${link} title="${esc(ch.login ? '#' + ch.login : '')}">${pic}<span>${esc(ch.name || ch.login || id)}</span>${tags}</a>`;
+    };
+    const others = sh.participants.filter((id) => id !== me).length;
+    bar.innerHTML = `<span class="sh-title">🔗 Chat partagé${sh.demo ? ' <small>(simulation)</small>' : ''}</span>`
+      + sh.participants.map(chip).join('')
+      + `<span class="muted sh-hint">${others} chaîne${others > 1 ? 's' : ''} partenaire${others > 1 ? 's' : ''} · filtre « Origine » dans ⚙️ de chaque colonne</span>`
+      + (sh.demo ? '<button class="btn small ghost" id="sharedStop">Arrêter</button>' : '');
+    $('#sharedStop')?.addEventListener('click', () => run(api('POST', '/api/demo-shared', { on: false })));
+  }
 
   /* ---------------- Assistant de première configuration ---------------- */
   const wiz = { step: 0, auth: null, authError: '', autoShown: false, nextTimer: null };

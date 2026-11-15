@@ -57,7 +57,7 @@ const DEFAULT_SETTINGS = {
   overlayChat: {
     fontSize: 22, maxMessages: 12, hideAfter: 0, showBadges: true, showEvents: true,
     hideCommands: true, hideBots: true, background: 'rgba(10,12,16,0.55)', textColor: '#ffffff',
-    animation: 'slide', showTime: false,
+    animation: 'slide', showTime: false, showShared: true,
   },
   overlayHighlight: { duration: 0, position: 'bottom-left', scale: 1 },
   alerts: { follow: true, sub: true, subgift: true, raid: true, cheer: true, reward: true, duration: 6, sound: true, volume: 0.5 },
@@ -99,6 +99,8 @@ const state = {
   highlight: null,
   userstate: null,
   demo: false,
+  shared: null,          // session de chat partagé : { sessionId, hostId, participants: [id…], demo? }
+  channels: {},          // chaînes vues dans le chat partagé : id -> { id, login, name, avatar }
 };
 const history = [];
 const clients = new Set();
@@ -423,9 +425,91 @@ async function loadBadges() {
   try {
     add(await helix('GET', '/chat/badges/global'));
     add(await helix('GET', '/chat/badges?broadcaster_id=' + state.roomId));
+    // on garde les badges des chaînes partenaires du chat partagé (clés « id:set/version »)
+    for (const [k, v] of Object.entries(state.badges)) if (k.includes(':')) badges[k] = v;
     state.badges = badges;
     broadcast({ type: 'badges', badges });
   } catch (e) { log('Badges :', e.message); }
+}
+
+/* ------------------------------------------------------------------ */
+/* Chat partagé (Shared Chat) : plusieurs chaînes qui streament ensemble */
+/* ------------------------------------------------------------------ */
+const chanPending = new Set();
+const chanBadgesLoaded = new Set();
+const pushChannels = () => broadcast({ type: 'channels', channels: state.channels });
+// origine d'un message : renseignée seulement s'il vient d'une autre chaîne que la nôtre
+function srcOf(tags) {
+  const src = tags['source-room-id'];
+  if (!src || !tags['room-id'] || src === tags['room-id']) return null;
+  knowChannel(src);
+  return { roomId: src, badges: parseBadges(tags['source-badges']) };
+}
+function knowChannel(id) {
+  if (!id || state.channels[id]?.avatar || chanPending.has(id) || String(id).startsWith('demo')) return;
+  if (!state.channels[id]) { state.channels[id] = { id, login: '', name: 'Autre chaîne', avatar: '' }; pushChannels(); }
+  if (!config.auth?.token) return;
+  chanPending.add(id);
+  resolveChannels([id]).finally(() => chanPending.delete(id));
+}
+async function resolveChannels(ids) {
+  ids = [...new Set(ids)].filter((id) => id && !String(id).startsWith('demo'));
+  if (!ids.length || !config.auth?.token) return;
+  try {
+    const d = await helix('GET', '/users?' + ids.map((i) => 'id=' + encodeURIComponent(i)).join('&'));
+    for (const u of d.data || []) state.channels[u.id] = { id: u.id, login: u.login, name: u.display_name, avatar: u.profile_image_url };
+    pushChannels();
+    for (const id of ids) if (id !== state.roomId) loadSourceBadges(id);
+  } catch (e) { log('Chat partagé (chaînes) :', e.message); }
+}
+// badges d'abonné propres à chaque chaîne partenaire, rangés sous « id:set/version »
+async function loadSourceBadges(id) {
+  if (chanBadgesLoaded.has(id) || !config.auth?.token) return;
+  chanBadgesLoaded.add(id);
+  try {
+    const d = await helix('GET', '/chat/badges?broadcaster_id=' + encodeURIComponent(id));
+    (d.data || []).forEach((set) => set.versions.forEach((v) => { state.badges[id + ':' + set.set_id + '/' + v.id] = v.image_url_2x; }));
+    broadcast({ type: 'badges', badges: state.badges });
+  } catch (e) { chanBadgesLoaded.delete(id); }
+}
+const chanName = (id) => state.channels[id]?.name || state.channels[id]?.login || 'une chaîne';
+function setShared(session, phase, { silent = false, demo = false } = {}) {
+  const prev = state.shared;
+  state.shared = phase === 'end' ? null : session;
+  if (state.shared) resolveChannels(state.shared.participants.filter((id) => !state.channels[id]?.avatar));
+  broadcast({ type: 'shared', shared: state.shared, channels: state.channels });
+  if (silent) return;
+  const me = state.roomId || 'demo-me';
+  const others = (s) => (s?.participants || []).filter((id) => id !== me);
+  const ev = { type: 'event', kind: 'shared', id: rid(), ts: Date.now(), user: null, phase, demo };
+  if (phase === 'begin') {
+    ev.partners = others(state.shared).map(chanName);
+    ev.host = state.shared.hostId === me ? '' : chanName(state.shared.hostId);
+  } else if (phase === 'update') {
+    const before = new Set(others(prev)); const after = new Set(others(state.shared));
+    ev.joined = [...after].filter((id) => !before.has(id)).map(chanName);
+    ev.left = [...before].filter((id) => !after.has(id)).map(chanName);
+    if (!ev.joined.length && !ev.left.length) return;
+  }
+  emitItem(ev);
+  log('Chat partagé :', phase, (state.shared?.participants || []).map(chanName).join(', '));
+}
+function sharedFromEvent(e) {
+  for (const p of e.participants || []) {
+    const id = p.broadcaster_user_id;
+    if (!state.channels[id]?.avatar) state.channels[id] = { ...(state.channels[id] || {}), id, login: p.broadcaster_user_login, name: p.broadcaster_user_name, avatar: state.channels[id]?.avatar || '' };
+  }
+  return { sessionId: e.session_id, hostId: e.host_broadcaster_user_id, participants: (e.participants || []).map((p) => p.broadcaster_user_id) };
+}
+// au démarrage (ou après un redémarrage en plein live) : récupère la session en cours
+async function loadSharedSession() {
+  if (!state.roomId || !config.auth?.token) return;
+  try {
+    const d = await helix('GET', '/shared_chat/session?broadcaster_id=' + state.roomId);
+    const s = d.data?.[0];
+    if (s) setShared({ sessionId: s.session_id, hostId: s.host_broadcaster_id, participants: (s.participants || []).map((p) => p.broadcaster_id) }, 'begin', { silent: true });
+    else if (state.shared && !state.shared.demo) setShared(null, 'end', { silent: true });
+  } catch (e) { log('Chat partagé (session) :', e.message); }
 }
 
 /* ------------------------------------------------------------------ */
@@ -483,16 +567,18 @@ function chatItem(tags, prefix, text) {
       id: tags['reply-parent-msg-id'], login: tags['reply-parent-user-login'],
       name: tags['reply-parent-display-name'], text: tags['reply-parent-msg-body'],
     } : null,
+    source: srcOf(tags),
   };
 }
 const TIERS = { Prime: 'Prime', 1000: 'Tier 1', 2000: 'Tier 2', 3000: 'Tier 3' };
 
 function handleUserNotice(m) {
   const t = m.tags;
-  const kindRaw = t['msg-id'];
+  // chat partagé : un abo/cadeau/raid chez une chaîne partenaire arrive en « sharedchatnotice », le vrai type est dans source-msg-id
+  const kindRaw = t['msg-id'] === 'sharedchatnotice' ? t['source-msg-id'] : t['msg-id'];
   const text = m.params[1] || '';
   const user = userFromTags(t, m.prefix);
-  const base = { type: 'event', id: t.id || rid(), ts: Number(t['tmi-sent-ts']) || Date.now(), user, text, emotes: t.emotes || '', systemText: t['system-msg'] || '' };
+  const base = { type: 'event', id: t.id || rid(), ts: Number(t['tmi-sent-ts']) || Date.now(), user, text, emotes: t.emotes || '', systemText: t['system-msg'] || '', source: srcOf(t) };
   const p = (k) => t['msg-param-' + k];
   switch (kindRaw) {
     case 'sub': case 'resub':
@@ -535,7 +621,7 @@ async function handleIrcLine(line) {
       const target = m.params[1];
       if (target) {
         const duration = Number(m.tags['ban-duration']) || 0;
-        emitItem({ type: 'clearUser', id: rid(), ts: Date.now(), userId: m.tags['target-user-id'], login: target, duration });
+        emitItem({ type: 'clearUser', id: rid(), ts: Date.now(), userId: m.tags['target-user-id'], login: target, duration, source: srcOf(m.tags) });
       } else emitItem({ type: 'clear', id: rid(), ts: Date.now() });
       break;
     }
@@ -656,6 +742,7 @@ async function subscribeAll(sessionId) {
     ['channel.shoutout.create', '1', BM], ['channel.shoutout.receive', '1', BM],
     ['channel.shield_mode.begin', '1', BM], ['channel.shield_mode.end', '1', BM],
     ['channel.unban', '1', B], ['channel.unban_request.create', '1', BM], ['channel.warning.send', '1', BM],
+    ['channel.shared_chat.begin', '1', B], ['channel.shared_chat.update', '1', B], ['channel.shared_chat.end', '1', B],
   ];
   const sub = (type, version, condition) => helix('POST', '/eventsub/subscriptions', { type, version, condition, transport: { method: 'websocket', session_id: sessionId } });
   const failed = [];
@@ -675,6 +762,7 @@ async function subscribeAll(sessionId) {
   state.eventsub = failed.length === 0 ? 'on' : failed.length === subs.length ? 'error' : 'partial';
   state.eventsubDetail = failed.length ? 'Indisponible : ' + failed.join(', ') + ' (il faut être le streamer ou modo de la chaîne)' : '';
   pushStatus();
+  loadSharedSession();
 }
 function handleESNotification(payload) {
   const type = payload.subscription?.type;
@@ -720,6 +808,9 @@ function handleESNotification(payload) {
     case 'channel.unban': return ev('unban', { user: u(e.user_id, e.user_login, e.user_name), by: e.moderator_user_name });
     case 'channel.unban_request.create': return ev('unbanrequest', { user: u(e.user_id, e.user_login, e.user_name), text: e.text || '' });
     case 'channel.warning.send': return ev('warn', { user: u(e.user_id, e.user_login, e.user_name), by: e.moderator_user_name, reason: e.reason || '' });
+    case 'channel.shared_chat.begin': return setShared(sharedFromEvent(e), 'begin');
+    case 'channel.shared_chat.update': return setShared(sharedFromEvent(e), state.shared ? 'update' : 'begin');
+    case 'channel.shared_chat.end': return setShared(null, 'end');
     default: return undefined;
   }
 }
@@ -744,6 +835,12 @@ function demoTick() {
   const user = { id: 'demo-' + name, login: name.toLowerCase(), name, color, badges: badges.map((b) => ({ set: b.split('/')[0], version: b.split('/')[1] })) };
   user.mod = badges.some((b) => /^(moderator|broadcaster)/.test(b)); user.vip = badges.some((b) => b.startsWith('vip')); user.sub = badges.some((b) => b.startsWith('subscriber'));
   const base = { id: rid(), ts: Date.now(), user, demo: true };
+  // chat partagé simulé : une partie des messages vient des chaînes partenaires
+  if (state.shared?.demo && Math.random() < 0.4) {
+    const p = DEMO_PARTNERS[Math.floor(Math.random() * DEMO_PARTNERS.length)];
+    base.source = { roomId: p.id, badges: user.badges.filter((b) => b.set !== 'broadcaster') };
+    base.user = { ...user, id: user.id + '-' + p.id, name: user.name + '_' + p.login.slice(0, 4), login: user.login + '_' + p.login.slice(0, 4) };
+  }
   if (r < 0.07) emitItem({ ...base, type: 'event', kind: 'follow' });
   else if (r < 0.11) emitItem({ ...base, type: 'event', kind: 'sub', months: Math.ceil(Math.random() * 20), tier: 'Tier 1', resub: true, text: 'Toujours là depuis le début !' });
   else if (r < 0.13) emitItem({ ...base, type: 'event', kind: 'raid', viewers: Math.ceil(Math.random() * 80) });
@@ -761,7 +858,24 @@ function setDemo(on) {
   clearTimeout(demoTimer);
   state.demo = !!on;
   if (state.demo) demoTick();
+  else if (state.shared?.demo) setDemoShared(false);
   pushStatus();
+}
+const DEMO_PARTNERS = [
+  { id: 'demo-ch1', login: 'novastream', name: 'NovaStream', avatar: '', color: '#ff7aa8' },
+  { id: 'demo-ch2', login: 'poutinetv', name: 'PoutineTV', avatar: '', color: '#ffb648' },
+];
+function setDemoShared(on) {
+  if (on) {
+    if (state.shared && !state.shared.demo) throw new Error('Une vraie session de chat partagé est en cours');
+    const me = state.roomId || 'demo-me';
+    if (!state.roomId) state.channels[me] = { id: me, login: config.channel || 'ma_chaine', name: config.channel || 'Ma chaîne', avatar: '' };
+    DEMO_PARTNERS.forEach((p) => { state.channels[p.id] = p; });
+    if (!state.demo) setDemo(true);
+    setShared({ sessionId: 'demo', hostId: me, participants: [me, ...DEMO_PARTNERS.map((p) => p.id)], demo: true }, 'begin', { demo: true });
+  } else if (state.shared?.demo) {
+    setShared(null, 'end', { demo: true });
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -785,7 +899,11 @@ app.post('/api/config', wrap(async (req) => {
   if (typeof clientId === 'string') config.clientId = clientId.trim();
   if (typeof channel === 'string') {
     const ch = channel.trim().replace(/^#/, '').replace(/^https?:\/\/(www\.)?twitch\.tv\//, '').toLowerCase();
-    if (ch !== config.channel) { config.channel = ch; state.roomId = null; state.emotes = {}; state.badges = {}; stopEventSub(); history.length = 0; ircConnect(); }
+    if (ch !== config.channel) {
+      config.channel = ch; state.roomId = null; state.emotes = {}; state.badges = {}; state.shared = null; state.channels = {}; chanBadgesLoaded.clear();
+      stopEventSub(); history.length = 0; ircConnect();
+      broadcast({ type: 'shared', shared: null, channels: {} });
+    }
   }
   saveConfig(); pushStatus();
 }));
@@ -924,6 +1042,7 @@ app.get('/api/categories', wrap(async (req) => {
 }));
 
 app.post('/api/demo', wrap((req) => setDemo(req.body?.on)));
+app.post('/api/demo-shared', wrap((req) => setDemoShared(!!req.body?.on)));
 app.post('/api/test-event', wrap((req) => {
   const kind = req.body?.kind || 'follow';
   const user = { id: 'demo-test', login: 'viewer_test', name: 'Viewer_Test', color: '#54a0ff', badges: [] };
@@ -945,7 +1064,7 @@ wss.on('connection', (ws) => {
   clients.add(ws);
   ws.send(JSON.stringify({
     type: 'init', status: publicStatus(), settings, planning, emotes: state.emotes, badges: state.badges,
-    highlight: state.highlight, history,
+    highlight: state.highlight, history, shared: state.shared, channels: state.channels,
   }));
   ws.on('close', () => clients.delete(ws));
   ws.on('error', () => clients.delete(ws));

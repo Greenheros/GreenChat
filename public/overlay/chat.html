@@ -14,6 +14,8 @@
   .name { font-weight: 800; }
   .time { opacity: .6; font-size: .7em; margin-right: 4px; }
   .badge { height: 1em; vertical-align: -0.12em; margin-right: 4px; }
+  .src { height: 1em; width: 1em; border-radius: 50%; vertical-align: -0.12em; margin-right: 5px; object-fit: cover; }
+  .src-txt { display: inline-grid; place-items: center; font-size: 0.6em; font-weight: 800; color: #fff; height: 1.65em; width: 1.65em; vertical-align: 0.1em; }
   .emote { height: 1.6em; vertical-align: middle; margin: -0.3em 1px; }
   .mention, .at { font-weight: 700; }
   .ev { border-left: 4px solid var(--accent, #2ee59d); }
@@ -30,7 +32,7 @@
 <script>
 (() => {
   const P = GC.params();
-  let cfg = {}; let emotes = Object.create(null); let badges = {}; let ignored = [];
+  let cfg = {}; let emotes = Object.create(null); let badges = {}; let ignored = []; let channels = {};
   const list = document.getElementById('list');
 
   function apply(settings) {
@@ -46,13 +48,14 @@
   function show(it, animate = true) {
     let html = ''; let cls = 'm';
     const time = cfg.showTime ? `<span class="time">${GC.pad(new Date(it.ts).getHours())}:${GC.pad(new Date(it.ts).getMinutes())}</span>` : '';
+    if (it.source && (it.type !== 'chat' || !cfg.showShared)) return; // chat partagé
     if (it.type === 'chat') {
       if (cfg.hideCommands && (it.text || '').startsWith('!')) return;
       if (cfg.hideBots && ignored.includes((it.user?.login || '').toLowerCase())) return;
       if (it.firstMsg) cls += ' first';
       if (it.bits) cls += ' bits';
       const color = GC.nameColor(it.user);
-      html = time + (cfg.showBadges ? GC.badgesHtml(it.user, badges) : '') +
+      html = time + GC.srcHtml(it.source, channels) + (cfg.showBadges ? GC.badgesHtml(it.source ? { badges: it.source.badges } : it.user, badges, it.source?.roomId) : '') +
         `<span class="name" style="color:${GC.esc(color)}">${GC.esc(it.user?.name)}</span>${it.isAction ? ' ' : ' : '}` +
         `<span ${it.isAction ? `style="color:${GC.esc(color)};font-style:italic"` : ''}>${GC.renderText(it.text, it.emotes, { emotes })}</span>`;
     } else if (it.type === 'event') {
@@ -76,7 +79,7 @@
   GC.connect((m) => {
     switch (m.type) {
       case 'init':
-        apply(m.settings); emotes = GC.toMap(m.emotes); badges = m.badges || {}; list.innerHTML = '';
+        apply(m.settings); emotes = GC.toMap(m.emotes); badges = m.badges || {}; channels = m.channels || {}; list.innerHTML = '';
         if (P.preview && !m.history.length) {
           const u = (name, color) => ({ name, login: name.toLowerCase(), color, badges: [] });
           [[u('PixelPanda', '#ff6b6b'), 'Salut tout le monde !'], [u('LunaGamer', '#c56cf0'), 'GG c\'était propre Kappa'], [u('Toto_57', '#54a0ff'), 'On est combien ce soir ?']]
@@ -86,6 +89,7 @@
       case 'settings': apply(m.settings); break;
       case 'emotes': emotes = GC.toMap(m.emotes); break;
       case 'badges': badges = m.badges || {}; break;
+      case 'channels': case 'shared': if (m.channels) channels = m.channels; break;
       case 'chat': case 'event': show(m); break;
       case 'delete': remove(`[data-id="${CSS.escape(m.targetId)}"]`); break;
       case 'clearUser': remove(`[data-login="${CSS.escape(m.login)}"]`); break;

@@ -39,6 +39,7 @@
         <span>⭐ À l'écran :</span><span id="onscreenText"></span>
         <button class="btn small" id="onscreenOff">Retirer de l'écran</button>
       </div>
+      <div class="shared-bar" id="sharedBar" hidden></div>
       <div class="columns" id="columns"></div>
       <footer class="composer">
         <div class="replying" id="replying" hidden><span id="replyingText"></span><button class="x" id="replyCancel">✕</button></div>
@@ -276,7 +277,7 @@
           <button class="btn ghost" id="wizardBtn">Lancer l'assistant</button>
           <h3>Mode démo</h3>
           <p class="muted">Génère de faux messages et événements pour régler tes overlays hors live.</p>
-          <button class="btn ghost" id="demoBtn">Activer la démo</button>
+          <div class="row wrap"><button class="btn ghost" id="demoBtn">Activer la démo</button><button class="btn ghost" id="demoSharedBtn" title="Fait comme si deux autres chaînes partageaient ton chat, pour tester l'affichage et les filtres">Simuler un chat partagé</button></div>
         </div>
       </div>
     </section>
@@ -298,6 +299,7 @@
       <button class="btn small ghost" id="ucSo">Shoutout</button>
       <a class="btn small ghost" id="ucProfile" target="_blank" rel="noopener">Profil Twitch ↗</a>
     </div>
+    <p class="uc-shared" id="ucShared" hidden></p>
     <h4>Messages de la session</h4>
     <div class="uc-msgs" id="ucMsgs"></div>
   </div>

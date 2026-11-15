@@ -28,13 +28,35 @@ window.GC = (() => {
   }
 
   const BADGE_FALLBACK = { broadcaster: '🎥', moderator: '🗡️', vip: '💎', subscriber: '⭐', founder: '🏅', partner: '✔️', staff: '🔧', premium: '👑', 'bits': '🔷', 'sub-gifter': '🎁' };
-  function badgesHtml(user, badgeMap) {
+  // roomId : chaîne d'origine (chat partagé) pour trouver ses badges d'abonné à elle
+  function badgesHtml(user, badgeMap, roomId) {
     return (user?.badges || []).map((b) => {
-      const url = badgeMap && badgeMap[b.set + '/' + b.version];
+      const key = b.set + '/' + b.version;
+      const url = badgeMap && ((roomId && badgeMap[roomId + ':' + key]) || badgeMap[key]);
       if (url) return `<img class="badge" src="${esc(url)}" alt="${esc(b.set)}" title="${esc(b.set)}">`;
       const f = BADGE_FALLBACK[b.set];
       return f ? `<span class="badge badge-txt" title="${esc(b.set)}">${f}</span>` : '';
     }).join('');
+  }
+
+  /* Chat partagé : pastille de la chaîne d'où vient un message */
+  function srcColor(ch) {
+    if (ch?.color) return ch.color;
+    const s = (ch?.login || ch?.id || '') + ''; let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return DEFAULT_COLORS[Math.abs(h) % DEFAULT_COLORS.length];
+  }
+  function srcHtml(source, channels) {
+    if (!source) return '';
+    const ch = (channels && channels[source.roomId]) || { id: source.roomId, name: 'Autre chaîne' };
+    const title = 'Chat partagé : message venant de ' + (ch.login ? '#' + ch.login : 'une autre chaîne');
+    return ch.avatar
+      ? `<img class="src" src="${esc(ch.avatar)}" alt="" title="${esc(title)}">`
+      : `<span class="src src-txt" style="background:${esc(srcColor(ch))}" title="${esc(title)}">${esc((ch.name || '?').charAt(0).toUpperCase())}</span>`;
+  }
+  function srcName(source, channels) {
+    const ch = source && channels && channels[source.roomId];
+    return ch ? (ch.name || ch.login) : 'une autre chaîne';
   }
 
   function toMap(obj) { return Object.assign(Object.create(null), obj || {}); }
@@ -120,6 +142,15 @@ window.GC = (() => {
       case 'unban': return { icon: '♻️', label: 'Unban', html: `${n} a été débanni${ev.by ? ' par ' + esc(ev.by) : ''}` };
       case 'unbanrequest': return { icon: '🙏', label: 'Demande de déban', html: `${n} demande à être débanni` };
       case 'warn': return { icon: '⚠️', label: 'Avertissement', html: `${n} a reçu un avertissement${ev.by ? ' de ' + esc(ev.by) : ''}${ev.reason ? ' : ' + esc(ev.reason) : ''}` };
+      case 'shared': {
+        const list = (a) => (a || []).map((x) => `<b>${esc(x)}</b>`).join(', ');
+        if (ev.phase === 'begin') return { icon: '🔗', label: 'Chat partagé', html: `Chat partagé activé avec ${list(ev.partners) || "d'autres chaînes"}${ev.host ? ` (hôte : <b>${esc(ev.host)}</b>)` : ''}` };
+        if (ev.phase === 'end') return { icon: '🔗', label: 'Chat partagé', html: 'Chat partagé <b>terminé</b>' };
+        const parts = [];
+        if (ev.joined?.length) parts.push(`${list(ev.joined)} rejoint le chat partagé`);
+        if (ev.left?.length) parts.push(`${list(ev.left)} quitte le chat partagé`);
+        return { icon: '🔗', label: 'Chat partagé', html: parts.join(' · ') };
+      }
       case 'watchstreak': return { icon: '🔥', label: 'Série de streams', html: `${n} a regardé <b>${ev.value} streams d'affilée</b> !` };
       default: return { icon: 'ℹ️', label: 'Info', html: esc(ev.systemText || 'Événement') };
     }
@@ -185,5 +216,5 @@ window.GC = (() => {
 
   function params() { return Object.fromEntries(new URLSearchParams(location.search)); }
 
-  return { esc, connect, api, nameColor, badgesHtml, renderText, eventInfo, toMap, DAYS, pad, isoDate, dayIndex, weekStart, fmtTime, streamsForDate, upcoming, countdown, ding, params };
+  return { esc, connect, api, nameColor, badgesHtml, srcHtml, srcName, srcColor, renderText, eventInfo, toMap, DAYS, pad, isoDate, dayIndex, weekStart, fmtTime, streamsForDate, upcoming, countdown, ding, params };
 })();

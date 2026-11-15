@@ -267,3 +267,23 @@ label.check.sub { margin: 2px 0; font-size: 13px; }
 .wiz-summary li { padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
 .wiz-wait { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: wizPulse 1s infinite alternate; }
 @keyframes wizPulse { from { opacity: .25; } to { opacity: 1; } }
+
+/* ---------------- Chat partagé ---------------- */
+.shared-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 14px; background: color-mix(in srgb, #9147ff 16%, var(--bg2)); border-bottom: 1px solid var(--line); font-size: 13px; }
+.sh-title { font-weight: 700; margin-right: 4px; }
+.sh-title small { font-weight: 400; color: var(--muted); }
+.sh-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 2px; border-radius: 99px; background: var(--bg3); border: 1px solid var(--line); color: var(--text); text-decoration: none; }
+a.sh-chip[href]:hover { border-color: #9147ff; }
+.sh-chip img, .sh-chip .src-txt { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+.sh-chip small { font-size: 10px; color: var(--muted); background: var(--bg); border-radius: 99px; padding: 0 6px; }
+.sh-chip small.host { color: #c9a8ff; }
+.sh-hint { margin-left: auto; font-size: 12px; }
+.src { width: 16px; height: 16px; border-radius: 50%; vertical-align: -3px; margin-right: 4px; object-fit: cover; outline: 1px solid #9147ff99; }
+.src-txt { display: inline-grid; place-items: center; font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 1px #0006; }
+.msg.shared { border-left-color: #9147ff66; }
+.event.from-partner { opacity: 0.75; border-left-style: dashed; }
+.src-tag { font-size: 11px; color: var(--muted); background: var(--bg); border-radius: 99px; padding: 1px 8px 1px 2px; margin-left: 4px; white-space: nowrap; }
+.src-tag .src { width: 14px; height: 14px; vertical-align: -3px; }
+.event.shared { border-left-color: #9147ff; background: #9147ff14; }
+.fp-src { margin: 8px 0 0; }
+.uc-shared { background: color-mix(in srgb, #9147ff 14%, var(--bg)); border: 1px solid #9147ff55; border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.45; }
