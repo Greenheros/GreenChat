@@ -271,6 +271,9 @@
           <label class="check"><input type="checkbox" id="sndMention"> Son pour une mention / mot surligné</label>
           <label class="check"><input type="checkbox" id="sndEvent"> Son pour follow / abo / raid</label>
           <div class="row"><button class="btn" id="saveChatSettings">Enregistrer</button></div>
+          <h3>Assistant de configuration</h3>
+          <p class="muted">Refaire pas à pas le réglage de la chaîne, de la connexion Twitch et d'OBS.</p>
+          <button class="btn ghost" id="wizardBtn">Lancer l'assistant</button>
           <h3>Mode démo</h3>
           <p class="muted">Génère de faux messages et événements pour régler tes overlays hors live.</p>
           <button class="btn ghost" id="demoBtn">Activer la démo</button>
@@ -319,6 +322,76 @@
       <button class="btn danger" id="slotDelete">Supprimer</button>
       <button class="btn" id="slotOk">Valider</button>
     </div>
+  </div>
+</div>
+
+<!-- Assistant de première configuration -->
+<div class="modal wiz" id="wizard" hidden>
+  <div class="modal-box wiz-box">
+    <button class="x wiz-close" id="wizClose" title="Fermer l'assistant">✕</button>
+    <ol class="wiz-steps" id="wizSteps">
+      <li>Chaîne</li><li>Appli Twitch</li><li>Connexion</li><li>OBS</li><li>Terminé</li>
+    </ol>
+
+    <section class="wiz-page" data-step="0">
+      <div class="wiz-hero">💚</div>
+      <h2>Bienvenue dans GreenChat</h2>
+      <p>On va régler l'essentiel en quelques minutes : ta chaîne, ta connexion Twitch et OBS.</p>
+      <p class="muted">Tu peux t'arrêter à tout moment et reprendre plus tard depuis <b>Réglages → Assistant de configuration</b>.</p>
+      <div class="row between"><button class="btn ghost" data-wiz="skip">Plus tard</button><button class="btn" data-wiz="next">C'est parti →</button></div>
+    </section>
+
+    <section class="wiz-page" data-step="1">
+      <h2>📺 Ta chaîne Twitch</h2>
+      <p>Quelle chaîne GreenChat doit-il suivre ? En général, la tienne.</p>
+      <label>Nom de la chaîne <span class="muted">(ou son adresse twitch.tv/…)</span><input id="wizChannel" placeholder="ta_chaine" autocomplete="off" spellcheck="false"></label>
+      <p class="wiz-msg" id="wizChannelMsg"></p>
+      <div class="row between"><button class="btn ghost" data-wiz="prev">← Retour</button><button class="btn" id="wizChannelOk">Continuer →</button></div>
+    </section>
+
+    <section class="wiz-page" data-step="2">
+      <h2>🔧 Ton appli Twitch</h2>
+      <p>Pour écrire, modérer et recevoir les follows, GreenChat a besoin d'un <b>Client ID</b>. C'est gratuit et ça se crée une seule fois :</p>
+      <ol class="wiz-list">
+        <li><a class="btn small" href="https://dev.twitch.tv/console/apps/create" target="_blank" rel="noopener">Ouvrir la console Twitch ↗</a> <span class="muted">(connecte-toi si besoin)</span></li>
+        <li>Nom : ce que tu veux, par exemple <code>GreenChat <span id="wizAppName">perso</span></code></li>
+        <li>URL de redirection OAuth : <code>http://localhost</code> <button class="btn small ghost" data-copy="http://localhost">Copier</button></li>
+        <li>Catégorie : <b>Chat Bot</b> · Type de client : <b>Public</b> <span class="wiz-warn">important</span></li>
+        <li>Clique sur <b>Créer</b>, puis sur <b>Gérer</b> : copie le <b>Client ID</b> et colle-le ci-dessous.</li>
+      </ol>
+      <label>Client ID<input id="wizClientId" placeholder="30 lettres et chiffres" autocomplete="off" spellcheck="false"></label>
+      <p class="wiz-msg" id="wizClientMsg"></p>
+      <div class="row between">
+        <button class="btn ghost" data-wiz="prev">← Retour</button>
+        <div class="row"><button class="btn ghost" data-wiz="readonly" title="Le chat s'affichera, mais sans envoi, modération ni événements">Rester en lecture seule</button><button class="btn" id="wizClientOk">Continuer →</button></div>
+      </div>
+    </section>
+
+    <section class="wiz-page" data-step="3">
+      <h2>🔑 Connexion à Twitch</h2>
+      <div id="wizAuth"></div>
+      <div class="row between"><button class="btn ghost" data-wiz="prev">← Retour</button><button class="btn ghost" data-wiz="next" id="wizAuthSkip">Passer cette étape</button></div>
+    </section>
+
+    <section class="wiz-page" data-step="4">
+      <h2>🎥 Ajouter GreenChat à OBS</h2>
+      <h4>Le panneau comme dock</h4>
+      <p class="muted">OBS → <b>Docks</b> → <b>Docks de navigateur personnalisés…</b> → nom <code>GreenChat</code> et cette adresse :</p>
+      <div class="wiz-url"><code id="wizDockUrl"></code><button class="btn small ghost" data-copy-from="wizDockUrl">Copier</button></div>
+      <h4>Les overlays</h4>
+      <p class="muted">Dans une scène : <b>Sources → ＋ → Navigateur</b>, puis colle l'adresse et la taille indiquée.</p>
+      <div id="wizOverlays"></div>
+      <p class="muted">Pas en live ? Le <b>mode démo</b> envoie de faux messages pour placer tes overlays : <button class="btn small ghost" id="wizDemo">Activer la démo</button></p>
+      <div class="row between"><button class="btn ghost" data-wiz="prev">← Retour</button><button class="btn" data-wiz="next">Continuer →</button></div>
+    </section>
+
+    <section class="wiz-page" data-step="5">
+      <div class="wiz-hero">🎉</div>
+      <h2>Tout est prêt !</h2>
+      <ul class="wiz-summary" id="wizSummary"></ul>
+      <p class="muted">Tout se modifie ensuite dans <b>Réglages</b>. Les commandes de modération et de stream sont dans l'onglet <b>Stream</b>.</p>
+      <div class="row between"><button class="btn ghost" data-wiz="prev">← Retour</button><button class="btn" data-wiz="finish">Ouvrir le chat</button></div>
+    </section>
   </div>
 </div>
 

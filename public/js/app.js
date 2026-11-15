@@ -61,6 +61,7 @@
         S.items = []; S.byId.clear();
         (m.history || []).forEach((it) => addItem(it, false));
         applyStatus(); fillSettings(); renderColumns(); renderPlanning(); renderObs(); renderOnscreen();
+        maybeAutoWizard();
         break;
       case 'status': S.status = m.status; applyStatus(); break;
       case 'settings': S.settings = m.settings; document.documentElement.style.setProperty('--accent', S.settings.accent || '#2ee59d'); break;
@@ -71,6 +72,7 @@
       case 'auth':
         if (m.ok) { toast('Connecté à Twitch en tant que ' + m.login); renderAuth(); onAuthHooks.forEach((f) => f()); }
         else toast('Connexion Twitch échouée : ' + m.error, true);
+        wizOnAuth(m);
         break;
       case 'chat': case 'event': case 'notice': case 'delete': case 'clearUser': case 'clear':
         addItem(m, true); break;
@@ -1006,4 +1008,161 @@
       .then((s) => { S.settings = s; renderColumns(); });
   });
   $('#demoBtn').addEventListener('click', () => run(api('POST', '/api/demo', { on: !S.status.demo })));
+
+  /* ---------------- Assistant de première configuration ---------------- */
+  const wiz = { step: 0, auth: null, authError: '', autoShown: false, nextTimer: null };
+  const WIZ_LAST = 5;
+  const WIZ_OVERLAYS = [
+    ['💬 Chat', '/overlay/chat.html', '450 × 800'],
+    ['🔔 Alertes', '/overlay/alerts.html', '1920 × 1080'],
+    ['⭐ Message mis en avant', '/overlay/highlight.html', '1920 × 1080'],
+    ['📅 Planning', '/overlay/planning.html', '1920 × 1080'],
+  ];
+  const cleanChannel = (v) => v.trim().replace(/^#/, '').replace(/^https?:\/\/(www\.)?twitch\.tv\//i, '').replace(/[/?#].*$/, '').toLowerCase();
+  function wizMsg(sel, text, kind) { const el = $(sel); el.textContent = text || ''; el.className = 'wiz-msg' + (kind ? ' ' + kind : ''); }
+
+  function openWizard(step = 0) {
+    $('#wizChannel').value = S.status.channel || '';
+    $('#wizClientId').value = S.status.clientId || '';
+    wizMsg('#wizChannelMsg'); wizMsg('#wizClientMsg');
+    wiz.authError = '';
+    $('#wizard').hidden = false;
+    wizGo(step);
+  }
+  function closeWizard(markDone = true) {
+    clearTimeout(wiz.nextTimer);
+    $('#wizard').hidden = true;
+    if (markDone && !S.settings.setupDone) api('POST', '/api/settings', { setupDone: true }).then((s) => { S.settings = s; }).catch(() => {});
+  }
+  function wizGo(step) {
+    clearTimeout(wiz.nextTimer);
+    wiz.step = Math.max(0, Math.min(WIZ_LAST, step));
+    $$('.wiz-page').forEach((p) => p.classList.toggle('active', +p.dataset.step === wiz.step));
+    $$('#wizSteps li').forEach((li, i) => { li.className = i + 1 === wiz.step ? 'cur' : i + 1 < wiz.step ? 'done' : ''; });
+    wizMsg('#wizChannelMsg'); wizMsg('#wizClientMsg');
+    if (wiz.step === 1) setTimeout(() => $('#wizChannel').focus(), 50);
+    if (wiz.step === 2) { $('#wizAppName').textContent = cleanChannel($('#wizChannel').value) || 'perso'; setTimeout(() => $('#wizClientId').focus(), 50); }
+    if (wiz.step === 3) wizRenderAuth();
+    if (wiz.step === 4) wizRenderObs();
+    if (wiz.step === 5) wizRenderSummary();
+  }
+
+  $('#wizard').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-wiz],[data-copy],[data-copy-from]');
+    if (!b) return;
+    if (b.dataset.copy || b.dataset.copyFrom) {
+      const text = b.dataset.copy || $('#' + b.dataset.copyFrom).textContent;
+      copyText(text).then(() => { const t = b.textContent; b.textContent = '✓ Copié'; setTimeout(() => { b.textContent = t; }, 1200); }).catch(() => toast('Copie impossible : sélectionne le texte à la main', true));
+      return;
+    }
+    const a = b.dataset.wiz;
+    if (a === 'next') wizGo(wiz.step + 1);
+    else if (a === 'prev') wizGo(wiz.step === 4 && !S.status.clientId ? 2 : wiz.step - 1);
+    else if (a === 'readonly') wizGo(4);
+    else if (a === 'skip') closeWizard(true);
+    else if (a === 'finish') { closeWizard(true); $('.nav[data-tab="chat"]').click(); }
+  });
+  $('#wizClose').addEventListener('click', () => closeWizard(true));
+  $('#wizardBtn').addEventListener('click', () => openWizard(0));
+
+  // Étape 1 : la chaîne
+  async function wizSaveChannel() {
+    const ch = cleanChannel($('#wizChannel').value);
+    if (!ch) return wizMsg('#wizChannelMsg', 'Indique le nom de ta chaîne.', 'err');
+    if (!/^[a-z0-9_]{3,25}$/.test(ch)) return wizMsg('#wizChannelMsg', 'Un nom de chaîne Twitch fait de 3 à 25 caractères : lettres, chiffres et « _ ».', 'err');
+    $('#wizChannel').value = ch;
+    try {
+      if (ch !== S.status.channel) await api('POST', '/api/config', { channel: ch });
+      wizMsg('#wizChannelMsg', '✓ Chaîne enregistrée : le chat de #' + ch + ' arrive dans l\'onglet Chat.', 'ok');
+      wiz.nextTimer = setTimeout(() => wizGo(2), 700);
+    } catch (e) { wizMsg('#wizChannelMsg', e.message, 'err'); }
+  }
+  $('#wizChannelOk').addEventListener('click', wizSaveChannel);
+  $('#wizChannel').addEventListener('keydown', (e) => { if (e.key === 'Enter') wizSaveChannel(); });
+
+  // Étape 2 : le Client ID
+  async function wizSaveClient() {
+    const id = $('#wizClientId').value.trim();
+    if (!id) return wizMsg('#wizClientMsg', 'Colle le Client ID de ton appli, ou choisis « Rester en lecture seule ».', 'err');
+    if (!/^[a-z0-9]{30}$/i.test(id)) return wizMsg('#wizClientMsg', 'Un Client ID Twitch fait 30 lettres et chiffres. Vérifie que tu as copié le Client ID (et pas le « Secret »).', 'err');
+    try {
+      const changed = id !== S.status.clientId;
+      if (changed) { await api('POST', '/api/config', { clientId: id }); S.status.clientId = id; wiz.auth = null; }
+      wizMsg('#wizClientMsg', '✓ Client ID enregistré', 'ok');
+      wiz.nextTimer = setTimeout(() => { wizGo(3); if (!S.status.login && !wiz.auth) wizStartAuth(); }, 500);
+    } catch (e) { wizMsg('#wizClientMsg', e.message, 'err'); }
+  }
+  $('#wizClientOk').addEventListener('click', wizSaveClient);
+  $('#wizClientId').addEventListener('keydown', (e) => { if (e.key === 'Enter') wizSaveClient(); });
+
+  // Étape 3 : connexion (Device Code Flow, même mécanisme que Réglages)
+  async function wizStartAuth() {
+    wiz.authError = ''; wiz.auth = { loading: true }; wizRenderAuth();
+    try {
+      wiz.auth = await api('POST', '/api/auth/start');
+      authPending = wiz.auth; renderAuth();
+      window.open(wiz.auth.verificationUri, '_blank', 'noopener');
+    } catch (e) {
+      wiz.auth = null;
+      wiz.authError = /invalid client/i.test(e.message) ? 'Twitch ne reconnaît pas ce Client ID.' : e.message;
+    }
+    wizRenderAuth();
+  }
+  function wizRenderAuth() {
+    const box = $('#wizAuth'); const st = S.status; const skip = $('#wizAuthSkip');
+    skip.className = 'btn ghost'; skip.textContent = 'Passer cette étape';
+    if (st.login) {
+      const other = st.channel && st.login.toLowerCase() !== st.channel.toLowerCase();
+      box.innerHTML = `<p class="wiz-msg ok" style="font-size:15px">✅ Connecté en tant que <b>${esc(st.login)}</b></p>
+        ${other ? `<p class="muted">⚠️ Ce n'est pas le compte de la chaîne <b>#${esc(st.channel)}</b> : tu pourras modérer si tu y es modo, mais les raids, pubs, sondages et prédictions demandent le compte du streamer.</p>` : '<p class="muted">Tu as accès à toutes les commandes : modération, raids, pubs, sondages, prédictions.</p>'}
+        <button class="btn small ghost" id="wizReauth">Utiliser un autre compte</button>`;
+      $('#wizReauth').onclick = async () => { await run(api('POST', '/api/auth/logout')); S.status.login = null; wizStartAuth(); };
+      skip.className = 'btn'; skip.textContent = 'Continuer →';
+    } else if (wiz.auth?.loading) {
+      box.innerHTML = '<p><span class="wiz-wait"></span>Demande envoyée à Twitch…</p>';
+    } else if (wiz.auth) {
+      box.innerHTML = `<p>Un onglet Twitch vient de s'ouvrir. Connecte-toi avec <b>le compte du streamer</b>, puis saisis ce code :</p>
+        <div class="authcode">${esc(wiz.auth.userCode)}</div>
+        <div class="row wrap"><a class="btn" href="${esc(wiz.auth.verificationUri)}" target="_blank" rel="noopener">Ouvrir twitch.tv/activate ↗</a><button class="btn ghost" data-copy="${esc(wiz.auth.userCode)}">Copier le code</button></div>
+        <p class="muted"><span class="wiz-wait"></span>En attente de ta validation sur Twitch… cette page avancera toute seule.</p>`;
+    } else {
+      box.innerHTML = `${wiz.authError ? `<p class="wiz-msg err">❌ ${esc(wiz.authError)}</p><p class="muted">Vérifie à l'étape précédente le Client ID et que l'appli est bien de type <b>Public</b>.</p>` : '<p>Dernière étape côté Twitch : autoriser GreenChat à utiliser ton compte. Rien ne quitte ta machine.</p>'}
+        <button class="btn" id="wizLogin">${wiz.authError ? 'Réessayer' : 'Se connecter avec Twitch'}</button>`;
+      $('#wizLogin').onclick = wizStartAuth;
+    }
+  }
+  function wizOnAuth(m) {
+    if ($('#wizard').hidden) return;
+    wiz.auth = null;
+    if (m.ok) { S.status.login = m.login; if (wiz.step === 3) { wizRenderAuth(); wiz.nextTimer = setTimeout(() => wizGo(4), 1500); } }
+    else { wiz.authError = m.error || 'Connexion refusée'; if (wiz.step === 3) wizRenderAuth(); }
+  }
+
+  // Étape 4 : OBS
+  function wizRenderObs() {
+    const base = location.origin;
+    $('#wizDockUrl').textContent = base + '/';
+    $('#wizOverlays').innerHTML = WIZ_OVERLAYS.map(([name, p, size], i) => `<div class="wiz-url"><span style="width:150px">${name}</span><code id="wizOv${i}">${esc(base + p)}</code><small>${size}</small><button class="btn small ghost" data-copy-from="wizOv${i}">Copier</button></div>`).join('');
+    $('#wizDemo').textContent = S.status.demo ? 'Arrêter la démo' : 'Activer la démo';
+  }
+  $('#wizDemo').addEventListener('click', () => run(api('POST', '/api/demo', { on: !S.status.demo })).then(() => { S.status.demo = !S.status.demo; wizRenderObs(); }));
+
+  // Étape 5 : récapitulatif
+  function wizRenderSummary() {
+    const st = S.status;
+    const rows = [
+      st.channel ? `✅ Chaîne suivie : <b>#${esc(st.channel)}</b>` : '⚠️ Aucune chaîne : le chat restera vide',
+      st.login ? `✅ Connecté à Twitch en tant que <b>${esc(st.login)}</b>` : '👀 Lecture seule : connecte ton compte dans Réglages pour écrire, modérer et recevoir les follows',
+      st.login ? (st.eventsub === 'on' ? '✅ Événements Twitch (follows, points, sondages…) actifs' : '⏳ Événements Twitch en cours d\'activation (détail dans Réglages → diagnostic)') : '',
+      '🎥 Adresses OBS : toujours disponibles dans l\'onglet OBS',
+    ].filter(Boolean);
+    $('#wizSummary').innerHTML = rows.map((r) => `<li>${r}</li>`).join('');
+  }
+
+  // Ouverture automatique au premier lancement (aucune chaîne configurée)
+  function maybeAutoWizard() {
+    if (wiz.autoShown) return;
+    wiz.autoShown = true;
+    if (!S.settings.setupDone && !S.status.channel) openWizard(0);
+  }
 })();

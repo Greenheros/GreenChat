@@ -40,6 +40,7 @@ Chat multi-colonnes, modération, commandes de streamer, sondages, alertes et ov
 1. Télécharge le projet (bouton **Code → Download ZIP**) et dézippe-le où tu veux.
 2. Double-clique sur **`start.bat`**. Au premier lancement, les dépendances s'installent toutes seules.
 3. Le panneau s'ouvre sur **http://localhost:3500**.
+4. Au premier lancement, un **assistant** te guide pas à pas : ta chaîne, ton appli Twitch, la connexion et l'ajout à OBS. Tu peux le relancer à tout moment depuis **Réglages → Assistant de configuration**.
 
 > 💡 GreenChat peut tourner sur un **PC dédié ou un mini-PC** : ouvre alors `http://IP-du-PC:3500` depuis le PC de stream.
 > Le pare-feu Windows doit autoriser Node.js sur les **réseaux privés**.
@@ -49,7 +50,7 @@ Chat multi-colonnes, modération, commandes de streamer, sondages, alertes et ov
 
 ## 🔑 Connexion à Twitch
 
-Sans connexion, le chat s'affiche en lecture seule. Pour écrire, modérer et recevoir les événements :
+Sans connexion, le chat s'affiche en lecture seule. L'assistant de première configuration fait ces étapes avec toi ; pour les faire à la main :
 
 1. Va sur [dev.twitch.tv/console/apps](https://dev.twitch.tv/console/apps) → **Enregistrer votre application**.
    - URL de redirection : `http://localhost`
@@ -136,7 +137,7 @@ greenchat/
 ## 🗺️ Feuille de route
 
 - [ ] Installateur Windows (`GreenChat-Setup.exe`) avec icône près de l'horloge et démarrage automatique
-- [ ] Assistant de première configuration
+- [x] Assistant de première configuration
 - [ ] Vue « dock » compacte pour les panneaux étroits d'OBS
 - [ ] Pilotage d'OBS via obs-websocket (changement de scène sur raid ou pub…)
 

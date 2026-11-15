@@ -236,3 +236,34 @@ label.check.sub { margin: 2px 0; font-size: 13px; }
 @keyframes tin { from { transform: translateY(10px); opacity: 0; } }
 
 @media (max-width: 900px) { .week { grid-template-columns: repeat(2, 1fr); } .plan-head { grid-template-columns: 1fr 1fr; } }
+
+/* ---------------- Assistant de première configuration ---------------- */
+.wiz { z-index: 60; }
+.wiz-box { width: min(620px, 94vw); padding: 24px 26px; }
+.wiz-close { position: absolute; top: 12px; right: 12px; }
+.wiz-steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 28px 18px 0; counter-reset: wiz; }
+.wiz-steps li { flex: 1; font-size: 11px; color: var(--muted); padding-top: 8px; border-top: 3px solid var(--line); counter-increment: wiz; }
+.wiz-steps li::before { content: counter(wiz) ". "; }
+.wiz-steps li.done { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--text); }
+.wiz-steps li.cur { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.wiz-page { display: none; }
+.wiz-page.active { display: block; animation: wizIn .2s ease; }
+@keyframes wizIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.wiz-page h2 { margin: 0 0 10px; }
+.wiz-page h4 { margin: 16px 0 4px; }
+.wiz-page p { line-height: 1.5; }
+.wiz-hero { font-size: 46px; line-height: 1; margin-bottom: 8px; }
+.wiz-list { padding-left: 20px; line-height: 1.6; margin: 8px 0 14px; }
+.wiz-list li { margin: 6px 0; }
+.wiz-list code, .wiz-url code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+.wiz-warn { font-size: 11px; background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); border-radius: 99px; padding: 1px 7px; }
+.wiz-msg { min-height: 1.4em; margin: -4px 0 6px; font-size: 13px; }
+.wiz-msg.ok { color: var(--accent); }
+.wiz-msg.err { color: var(--danger); }
+.wiz-url { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.wiz-url code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 8px; }
+.wiz-url small { color: var(--muted); white-space: nowrap; }
+.wiz-summary { list-style: none; padding: 0; margin: 12px 0; }
+.wiz-summary li { padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
+.wiz-wait { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: wizPulse 1s infinite alternate; }
+@keyframes wizPulse { from { opacity: .25; } to { opacity: 1; } }
